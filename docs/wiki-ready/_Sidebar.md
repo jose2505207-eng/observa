@@ -1,0 +1,15 @@
+### OBSERVA Wiki
+
+- [[Home]]
+- [[Product Requirements]]
+- [[Technical Architecture]]
+- [[Team Roles]]
+- [[Skills Matrix]]
+- [[Development Loops]]
+- [[Validation Gates]]
+- [[Demo Plan]]
+- [[GitHub Workflow]]
+- [[Auto Push Skill]]
+- [[Parallel Work Plan]]
+- [[Troubleshooting]]
+- [[Hackathon Scoring Strategy]]

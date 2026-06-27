@@ -1,4 +1,10 @@
-@CLAUDE_PROJECT.md
+# Project Memory: the LLM Wiki
+
+OBSERVA follows the **LLM Wiki** philosophy. The `wiki/` directory is the **single source of truth** for project memory — vision, architecture, features, decisions, status, and log. There is intentionally **no `CLAUDE_PROJECT.md`** and no second project tracker.
+
+**Before making any changes, read in order:** `wiki/README.md` → `wiki/index.md` → the wiki pages relevant to your task → recent entries in `wiki/log.md`.
+
+**After making changes:** update affected wiki pages, update `wiki/index.md` if you added pages, and append an entry to `wiki/log.md`. Never let the code and wiki diverge. Only mark a capability `Current` if the repository proves it; otherwise use `Planned` or `Research`.
 
 # CLAUDE.md
 

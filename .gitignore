@@ -15,3 +15,13 @@ dist/
 # Environment
 .env
 .env.local
+
+# Android / Gradle
+.gradle/
+.kotlin/
+local.properties
+*.iml
+captures/
+
+# IDE
+.idea/
