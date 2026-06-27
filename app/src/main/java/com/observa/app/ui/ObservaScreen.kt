@@ -19,7 +19,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Switch
@@ -62,6 +64,7 @@ fun ObservaScreen(controller: ObservaController) {
             .fillMaxSize()
             .background(Bg)
             .safeDrawingPadding() // keep content clear of status bar + gesture nav bar
+            .verticalScroll(rememberScrollState()) // all controls reachable; camera stays visible
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -79,7 +82,7 @@ fun ObservaScreen(controller: ObservaController) {
             modifier = Modifier.semantics { contentDescription = "Privacy: ${controller.privacyLabel}" },
         )
 
-        CameraPanel(controller, modifier = Modifier.weight(1f).fillMaxWidth())
+        CameraPanel(controller, modifier = Modifier.fillMaxWidth().height(280.dp))
 
         AlertBanner(controller.lastAlert)
         BrailleStatus(controller.brailleStatus)
