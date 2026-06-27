@@ -2,7 +2,7 @@
 
 Structured requirements with stable IDs. Reference these IDs in branches, commits, and PRs. Status is honest: `Done`, `In progress`, `Planned`, or `Needs verification`.
 
-> Repo reality check (2026-06-27): only the CameraX preview + frame-count loop and permission flow are implemented. Inference, alerts, dashboard metrics beyond frame count, OCR, voice, and haptics are not yet built.
+> Repo reality check (updated 2026-06-27, verified on device): implemented — CameraX loop (~30 FPS), brightness heuristic detector, hazard engine with cooldown/scene memory, spoken (TTS) + haptic alerts, deterministic Demo Mode, accessible dashboard (camera/frames/FPS/backend/cooldown/privacy) with TalkBack labels, offline (airplane-mode verified). Not yet built — real ExecuTorch/QNN/NPU inference, OCR, voice input. See `docs/current-status.md` for the full honesty ledger.
 
 ---
 

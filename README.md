@@ -14,9 +14,11 @@ Android-native, low-latency, battery-conscious, on-device inference (ExecuTorch)
 
 ## Current status
 
-Early development. **Working today:** a single-activity Jetpack Compose app with an always-on CameraX analysis loop (frames processed and counted on a background thread) and a runtime camera-permission flow. ExecuTorch is bundled but **on-device model inference is not yet implemented** — that is the current build target.
+**Working today (verified on a physical device in Airplane Mode):** a single-screen Jetpack Compose app with an always-on CameraX loop (~30 FPS), an on-device **brightness heuristic** detector, a **hazard engine** with cooldown + scene memory (no spam), **spoken (TTS)** and **haptic** alerts, a deterministic **Demo Mode**, and an accessible high-contrast dashboard (camera/frames/FPS/backend/cooldown/privacy) with TalkBack labels.
 
-This README intentionally states only what the repository proves. See the wiki for the full picture, including what is planned vs. researched.
+**Truthfully not done:** real ExecuTorch inference, QNN/NPU acceleration, OCR, and voice input. The UI says so — it shows `ExecuTorch: bundled, not invoked` and labels Demo Mode and the heuristic as such. A `VisionRuntime` abstraction is ready for a real inference path to drop in.
+
+Full honesty ledger: [`docs/current-status.md`](docs/current-status.md). Demo steps: [`docs/demo-script.md`](docs/demo-script.md). Plan: [`docs/implementation-plan.md`](docs/implementation-plan.md).
 
 ## The wiki is the project memory
 

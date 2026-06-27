@@ -23,7 +23,7 @@
 6. **User punchline.** The user never has to aim perfectly. OBSERVA orients them.
 
 ## Honesty note
-Demo only what the build proves. Today that is: Airplane Mode + live camera + incrementing frame counter (a fully-offline always-on loop). State current status plainly; describe inference/QNN as the active build target if not yet live. See [[Technical Architecture]] Truthful Backend Policy. Judges reward honesty + instrumentation.
+Demo only what the build proves. As of 2026-06-27 (verified on device in Airplane Mode) that is: live camera ~30 FPS, on-device brightness heuristic, hazard engine with cooldown/scene memory, spoken + haptic alerts, deterministic Demo Mode, and an accessible dashboard. **Not** real ExecuTorch/QNN/NPU inference, OCR, or voice — the UI shows `ExecuTorch: bundled, not invoked` and labels Demo/heuristic as such. Describe real inference/QNN as the next build target. See [[Technical Architecture]] Truthful Backend Policy and `docs/current-status.md`. Judges reward honesty + instrumentation.
 
 ## Backup Plan
 - **Model fails** → show deterministic Demo Mode (REQ-010).
