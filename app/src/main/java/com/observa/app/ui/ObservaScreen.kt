@@ -246,6 +246,7 @@ private fun Dashboard(controller: ObservaController) {
             },
             if (controller.voiceAvailable) OnDark else Accent,
         )
+        StatRow("Service", controller.serviceStatus, OnDark)
         StatRow("Privacy", controller.privacyLabel, Good)
     }
 }

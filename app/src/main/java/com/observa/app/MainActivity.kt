@@ -28,6 +28,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.observa.app.service.AmbientAwarenessService
+import com.observa.app.service.ServiceBridge
 import com.observa.app.ui.ObservaScreen
 import com.observa.app.ui.theme.OBSERVATheme
 
@@ -40,10 +42,19 @@ class MainActivity : ComponentActivity() {
         controller = ObservaController(applicationContext)
         controller.initVoice()
 
+        // Foreground-service notification actions (Stop / Mute / Repeat) route here.
+        ServiceBridge.instance = object : ServiceBridge {
+            override fun onStopRequested() { controller.observe(false); controller.setMute(true) }
+            override fun onMuteRequested() { controller.setMute(true) }
+            override fun onRepeatRequested() { controller.repeatLast() }
+        }
+
         setContent {
             OBSERVATheme {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     PermissionGate {
+                        // Start the foreground service only once the camera permission is granted.
+                        LaunchedEffect(Unit) { AmbientAwarenessService.start(applicationContext) }
                         ObservaScreen(controller)
                     }
                 }
@@ -52,6 +63,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        ServiceBridge.instance = null
+        AmbientAwarenessService.stop(applicationContext)
         controller.shutdown()
         super.onDestroy()
     }

@@ -25,6 +25,9 @@ import com.observa.app.hazard.Hazard
 import com.observa.app.hazard.HazardEngine
 import com.observa.app.hazard.Severity
 import com.observa.app.output.Speaker
+import com.observa.app.service.BatteryThermalPolicy
+import com.observa.app.service.ServiceState
+import com.observa.app.service.ThermalLevel
 import com.observa.app.runtime.ExecuTorchDetector
 import com.observa.app.runtime.HeuristicVisionRuntime
 import com.observa.app.runtime.InferenceStatus
@@ -93,6 +96,7 @@ class ObservaController(context: Context) {
     var brailleEnabled by mutableStateOf(true); private set
     var audioCuesEnabled by mutableStateOf(true); private set
     var hapticCuesEnabled by mutableStateOf(true); private set
+    var serviceStatus by mutableStateOf("normal rate"); private set
     val alerts = mutableStateListOf<String>()
 
     val brailleStatus: String get() = router.brailleStatus.text
@@ -155,6 +159,9 @@ class ObservaController(context: Context) {
     }
 
     fun toggleMute() = setMute(!muted)
+
+    /** Replay the last meaningful message (the foreground-notification "Repeat last" action). */
+    fun repeatLast() = router.repeatLast()
 
     /** Single source of truth for the observing state — shared by the UI toggle and voice. */
     fun observe(value: Boolean) {
@@ -261,6 +268,9 @@ class ObservaController(context: Context) {
             frameCount = rawFrameCount
             fps = fpsValue
             cooldownNote = engine.lastDecision
+            // Adaptive duty cycle from real battery + thermal state (back off under heat/low battery).
+            val duty = BatteryThermalPolicy.dutyCycle(pollPowerState())
+            serviceStatus = duty.statusLabel
             if (!demoMode && observing) {
                 val frame = latestFrame
                 if (frame != null) {
@@ -271,8 +281,26 @@ class ObservaController(context: Context) {
                     hazards.forEach { emit(it) }
                 }
             }
-            delay(400)
+            delay(duty.analysisIntervalMs)
         }
+    }
+
+    /** Read real battery + thermal state for the duty-cycle policy. Cheap; main-thread safe. */
+    private fun pollPowerState(): ServiceState {
+        val bm = appContext.getSystemService(Context.BATTERY_SERVICE) as? android.os.BatteryManager
+        val pct = bm?.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: 100
+        val charging = bm?.isCharging ?: false
+        val thermal = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            val pm = appContext.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+            when (val t = pm?.currentThermalStatus ?: 0) {
+                android.os.PowerManager.THERMAL_STATUS_NONE,
+                android.os.PowerManager.THERMAL_STATUS_LIGHT -> ThermalLevel.NORMAL
+                android.os.PowerManager.THERMAL_STATUS_MODERATE,
+                android.os.PowerManager.THERMAL_STATUS_SEVERE -> ThermalLevel.WARNING
+                else -> if (t >= android.os.PowerManager.THERMAL_STATUS_CRITICAL) ThermalLevel.CRITICAL else ThermalLevel.NORMAL
+            }
+        } else ThermalLevel.NORMAL
+        return ServiceState(batteryPercent = pct, charging = charging, thermal = thermal, cameraAvailable = cameraActive)
     }
 
     /** Play the deterministic demo sequence through the same engine/output. */

@@ -4,6 +4,29 @@ Newest entries first. Append an entry whenever you make a meaningful change to t
 
 ---
 
+## 2026-06-28 — v1.6.0 foreground service & reliability
+
+Branch `feature/v1.6-foreground-service`. Build + 92 unit tests pass; no `INTERNET`
+permission; device-verified on S25 Ultra in Airplane Mode.
+
+- Real **`AmbientAwarenessService`** (foreground, type `camera`) with a persistent honest
+  notification ("OBSERVA running offline. … Observing. No network used.") and accessible
+  **Stop / Mute / Repeat** actions routed via `ServiceBridge` → `ObservaController`. Device-verified:
+  `isForeground=true types=0x40`, notification visible in the shade under airplane mode.
+- Pure, unit-tested service layer: `ServiceStateReducer` (lifecycle/degrade transitions; camera
+  loss/permission/thermal/low-battery → DEGRADED, not silently stopped), `NotificationContent`,
+  `PermissionEducation`, `BatteryThermalPolicy`.
+- **Adaptive duty cycle** from real battery + thermal (`PowerManager`/`BatteryManager`): the
+  analysis loop interval scales (400 → 800 → 1500 ms) under heat/low-battery and reduces cue spam;
+  shown in the new dashboard **Service** row.
+- **Honest limitation:** true screen-off background camera capture is not yet wired (camera +
+  inference still run with the Activity foregrounded); documented in
+  `docs/manual-test-foreground-service.md`. No data leaves the device; service has no network.
+
+**Still not done:** v1.5 model artifact (`observa_detector.pte`) not bundled (blocked: no
+toolchain/AGPL); QNN never demonstrated active; v1.7 offline navigation; v1.8 release polish;
+screen-off background capture.
+
 ## 2026-06-28 — Wiki sync: model loading, OCR, cues, real detector (v1.3.0–v1.5.0)
 
 Brought the wiki in line with three shipped milestones (all device-verified on a

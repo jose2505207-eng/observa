@@ -16,11 +16,12 @@ owner: jose2505207-eng
 - **UI:** Jetpack Compose (Compose BOM `2026.02.01`), Material 3. Single `MainActivity` (`com.observa.app`), all-Compose, no XML layouts/fragments. Theme in `ui/theme/` as `OBSERVATheme`.
 - **Camera:** CameraX 1.6.1 (`camera-core`, `camera2`, `lifecycle`, `view`). Preview shown via Compose `AndroidView(PreviewView)`; `ImageAnalysis` runs on a single-thread executor.
 - **Permissions:** Runtime camera permission via `rememberLauncherForActivityResult`; fallback screen until granted. Manifest also declares `RECORD_AUDIO`, `VIBRATE`, `WAKE_LOCK`, `POST_NOTIFICATIONS`, and foreground-service (camera/microphone) permissions.
-- **On-device runtime:** ExecuTorch as a local AAR (`app/libs/executorch.aar`) via `implementation(files(...))` — **present but not yet invoked**. See [[executorch-qnn]].
+- **On-device runtime:** ExecuTorch as a local AAR (`app/libs/executorch.aar`) — the load/inference path is called for real, with honest fallback when no `.pte` is bundled. See [[executorch-qnn]].
+- **Foreground service:** `AmbientAwarenessService` (type `camera`) keeps OBSERVA foregrounded with a persistent honest notification + accessible Stop/Mute/Repeat actions; adaptive duty cycle from real battery/thermal. Device-verified. Screen-off background camera capture is a documented limitation (`docs/manual-test-foreground-service.md`).
 - **R8 keep rules:** live in `app/src/main/keepRules/` (AGP merges that directory).
 
 ## Future Vision
-- A foreground service for true always-on operation (permissions are pre-declared but no service exists yet).
+- Screen-off background camera capture in the service for true always-on operation.
 - TTS/haptic output integration ([[accessibility-principles]]).
 - Possible modularization (capture / inference / output / skills) as the codebase grows.
 
