@@ -44,11 +44,11 @@ class ModelLoadingTest {
     @Test fun strictParserRefusesUnknownShapes() {
         val parser = StrictUnknownShapeParser()
         val yoloLike = TensorOutput(longArrayOf(1, 25200, 85), FloatArray(25200 * 85))
-        assertTrue(parser.parse(listOf(yoloLike)).isEmpty())
+        assertTrue(parser.parse(listOf(yoloLike), nowMs = 0L).isEmpty())
     }
 
     @Test fun strictParserHandlesEmptyOutput() {
-        assertTrue(StrictUnknownShapeParser().parse(emptyList()).isEmpty())
+        assertTrue(StrictUnknownShapeParser().parse(emptyList(), nowMs = 0L).isEmpty())
     }
 
     // --- QNN honesty: detecting the library must never read as active acceleration ---

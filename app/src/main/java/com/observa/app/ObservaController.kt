@@ -100,6 +100,15 @@ class ObservaController(context: Context) {
     val backendStatus: String get() = if (demoMode) "scripted events" else heuristic.status.label
     val aiModelStatus: String get() = "AI model: ${executorch.status.label}"
     val aiModelDetail: String get() = executorch.detail
+
+    /** Live inference diagnostics for the dashboard (input/output shapes, latency, QNN). */
+    val aiDiagnostics: String
+        get() = if (modelNeedsPixels)
+            "in ${executorch.inputShape} · out ${executorch.lastOutputShapes} · " +
+                "${executorch.lastLatencyMs}ms (avg ${executorch.avgLatencyMs}ms) · " +
+                "QNN ${if (executorch.qnnActive) "active" else "off"}"
+        else executorch.detail
+
     /** True only when a real model is loaded; gates pixel capture in the analyzer. */
     val modelNeedsPixels: Boolean
         get() = executorch.status == InferenceStatus.LOADED_CPU ||

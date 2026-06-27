@@ -230,6 +230,7 @@ private fun Dashboard(controller: ObservaController) {
             controller.aiModelStatus.removePrefix("AI model: "),
             if (controller.modelNeedsPixels) Good else Accent,
         )
+        StatRow("AI detail", controller.aiDiagnostics, OnDark)
         StatRow("Alert cooldown", controller.cooldownNote, OnDark)
         StatRow("Observing", if (controller.observing) "On" else "Off", if (controller.observing) Good else Accent)
         StatRow("Demo Mode", if (controller.demoMode) "On" else "Off", if (controller.demoMode) Good else OnDark)

@@ -16,19 +16,19 @@ import java.io.File
  *
  *  - model absent  → [InferenceStatus.UNAVAILABLE], heuristic fallback, no detections.
  *  - load fails    → [InferenceStatus.FAILED], heuristic fallback, exact error logged, no crash.
- *  - load succeeds → [InferenceStatus.LOADED_QNN] only if the `forward` method's backends actually
- *                    include a QNN backend; otherwise [InferenceStatus.LOADED_CPU].
- *  - any output    → routed through a [DetectionParser]; the default refuses to emit labels for an
- *                    unverified output shape, so no fabricated detections are ever produced.
+ *  - load succeeds → [InferenceStatus.LOADED_QNN] ONLY if `forward`'s MethodMetadata.getBackends()
+ *                    includes a QNN backend; otherwise [InferenceStatus.LOADED_CPU].
+ *  - any output    → routed through a [DetectionParser]; the default YOLO parser returns empty for
+ *                    any unrecognized output shape, so no fabricated detections are ever produced.
  *
  * Pixels for inference come from [FrameInput.rgb], which the analyzer fills only while a model is
- * loaded. Inference is meant to be called off the UI thread (see ObservaController).
+ * loaded. Inference runs off the UI thread (see ObservaController).
  */
 class ExecuTorchDetector(
     private val modelAssetPath: String = "models/observa_detector.pte",
-    private val parser: DetectionParser = StrictUnknownShapeParser(),
-    private val inputWidth: Int = 224,
-    private val inputHeight: Int = 224,
+    private val parser: DetectionParser = YoloDetectionParser(),
+    private val inputWidth: Int = 640,
+    private val inputHeight: Int = 640,
 ) : InferenceEngine {
 
     @Volatile
@@ -37,8 +37,20 @@ class ExecuTorchDetector(
 
     @Volatile private var module: Module? = null
     var qnn: QnnStatus = QnnStatus.UNKNOWN; private set
-    var lastLatencyMs: Long = 0L; private set
     var detail: String = "not initialized"; private set
+
+    // --- Diagnostics (read by the UI/Braille diagnostics surface) ---
+    var modelBytes: Long = 0L; private set
+    var modelVersion: String = "unknown"; private set
+    var loadMs: Long = 0L; private set
+    var lastLatencyMs: Long = 0L; private set
+    var lastOutputShapes: String = "—"; private set
+    var inputShape: String = "[1, 3, $inputHeight, $inputWidth]"; private set
+    var backends: String = ""; private set
+    val qnnActive: Boolean get() = status == InferenceStatus.LOADED_QNN
+    private var latencySum = 0L
+    private var latencyCount = 0L
+    val avgLatencyMs: Long get() = if (latencyCount == 0L) 0L else latencySum / latencyCount
 
     override fun initialize(context: Context): InferenceStatus {
         qnn = QnnRuntimeChecker.check(context)
@@ -48,21 +60,24 @@ class ExecuTorchDetector(
             Log.i(TAG, "model absent at assets/$modelAssetPath → heuristic fallback. ${qnn.label}")
             return status
         }
+        modelVersion = readAsset(context, "$modelAssetPath.version") ?: "unspecified"
         return try {
             val path = copyAssetToFiles(context, modelAssetPath)
+            modelBytes = File(path).length()
             val t0 = SystemClock.elapsedRealtime()
             val m = Module.load(path)
             module = m
-            val loadMs = SystemClock.elapsedRealtime() - t0
+            loadMs = SystemClock.elapsedRealtime() - t0
             val methods = runCatching { m.getMethods().joinToString() }.getOrDefault("?")
-            val backends = runCatching { m.getMethodMetadata("forward").backends.joinToString() }
+            backends = runCatching { m.getMethodMetadata("forward").backends.joinToString() }
                 .getOrDefault("")
             val usesQnn = backends.contains("qnn", ignoreCase = true)
             status = if (usesQnn) InferenceStatus.LOADED_QNN else InferenceStatus.LOADED_CPU
-            detail = "${status.label} · backends=[$backends]"
+            detail = "${status.label} · ${modelBytes / 1024}KB · v=$modelVersion · backends=[$backends]"
             Log.i(
                 TAG,
-                "load success in ${loadMs}ms; methods=[$methods]; forward backends=[$backends]; " +
+                "load success in ${loadMs}ms; bytes=$modelBytes; version=$modelVersion; " +
+                    "methods=[$methods]; forward backends=[$backends]; parser=${parser.name}; " +
                     "QNN ${if (usesQnn) "ACTIVE for this model" else "present but NOT active (model not QNN-delegated)"}.",
             )
             status
@@ -79,25 +94,29 @@ class ExecuTorchDetector(
         val m = module ?: return emptyList()
         val rgb = frame.rgb ?: return emptyList()
         return try {
+            val nowMs = System.currentTimeMillis()
             val input = preprocess(rgb, frame.rgbWidth, frame.rgbHeight)
-            val tensor = Tensor.fromBlob(
-                input,
-                longArrayOf(1, 3, inputHeight.toLong(), inputWidth.toLong()),
-            )
+            val tensor = Tensor.fromBlob(input, longArrayOf(1, 3, inputHeight.toLong(), inputWidth.toLong()))
             val t0 = SystemClock.elapsedRealtime()
             val out: Array<EValue> = m.forward(EValue.from(tensor))
             lastLatencyMs = SystemClock.elapsedRealtime() - t0
+            latencySum += lastLatencyMs; latencyCount++
             val outputs = out.filter { it.isTensor }.map {
                 val t = it.toTensor()
                 TensorOutput(t.shape(), t.dataAsFloatArray)
             }
+            lastOutputShapes = outputs.joinToString { it.shape.contentToString() }
+            val objects = parser.parse(outputs, nowMs)
             Log.i(
-                TAG,
-                "inference ${lastLatencyMs}ms; output tensor shapes=${outputs.map { it.shape.contentToString() }}",
+                "OBSERVA_MODEL",
+                "inference ${lastLatencyMs}ms (avg ${avgLatencyMs}ms); outputs=[$lastOutputShapes]; " +
+                    "objects=${objects.size} via parser=${parser.name} " +
+                    objects.joinToString(prefix = "[", postfix = "]") { "${it.rawClass}->${it.label}@${"%.2f".format(it.confidence)}/${it.direction}" },
             )
-            val detections = parser.parse(outputs)
-            Log.i("OBSERVA_MODEL", "detection count=${detections.size} via parser=${parser.name}")
-            detections
+            // Map rich detections to the engine's generic Detection (label/confidence/direction).
+            objects.filter { it.hazardRelevant }.map {
+                Detection(label = engineLabel(it.label), confidence = it.confidence, direction = it.direction)
+            }
         } catch (e: Throwable) {
             Log.e(TAG, "inference failed → no detections this frame (no crash)", e)
             emptyList()
@@ -109,10 +128,15 @@ class ExecuTorchDetector(
         module = null
     }
 
+    /** Safety category → an engine label the HazardEngine understands. */
+    private fun engineLabel(safety: String): String = when (safety) {
+        "PERSON" -> "PERSON"
+        else -> "OBSTACLE" // VEHICLE and generic OBSTACLE both read as an obstacle hazard
+    }
+
     /**
      * Resize interleaved RGB (0..1) at [w]x[h] to a normalized CHW float buffer at the model input
-     * size using nearest-neighbor sampling. Normalization is plain 0..1 — documented in
-     * assets/models/README.md as the assumed input contract.
+     * size using nearest-neighbor sampling. Normalization is plain 0..1 (YOLO default).
      */
     private fun preprocess(rgb: FloatArray, w: Int, h: Int): FloatArray {
         val out = FloatArray(3 * inputWidth * inputHeight)
@@ -138,6 +162,12 @@ class ExecuTorchDetector(
             context.assets.open(path).use { true }
         } catch (_: Exception) {
             false
+        }
+
+        fun readAsset(context: Context, path: String): String? = try {
+            context.assets.open(path).use { it.readBytes().decodeToString().trim() }
+        } catch (_: Exception) {
+            null
         }
 
         /** ExecuTorch loads from a filesystem path, so copy the bundled asset into internal storage. */
