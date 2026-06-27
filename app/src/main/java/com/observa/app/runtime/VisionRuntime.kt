@@ -51,14 +51,3 @@ class HeuristicVisionRuntime(
         return out
     }
 }
-
-/**
- * Truthful stub for ExecuTorch. The AAR is bundled (app/libs/executorch.aar) but no model is
- * loaded or run yet, so this reports [RuntimeStatus.BUNDLED_NOT_INVOKED] and returns nothing.
- * It exists so the architecture (and the dashboard) is honest and ready for a real path.
- */
-class ExecuTorchVisionRuntime : VisionRuntime {
-    override val name = "ExecuTorch"
-    override val status = RuntimeStatus.BUNDLED_NOT_INVOKED
-    override suspend fun analyzeFrame(frame: FrameInput): List<Detection> = emptyList()
-}

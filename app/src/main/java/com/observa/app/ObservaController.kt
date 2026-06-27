@@ -18,7 +18,7 @@ import com.observa.app.hazard.Hazard
 import com.observa.app.hazard.HazardEngine
 import com.observa.app.hazard.Severity
 import com.observa.app.output.Speaker
-import com.observa.app.runtime.ExecuTorchVisionRuntime
+import com.observa.app.runtime.ExecuTorchDetector
 import com.observa.app.runtime.HeuristicVisionRuntime
 import com.observa.app.voice.CommandActions
 import com.observa.app.voice.CommandRouter
@@ -45,7 +45,7 @@ class ObservaController(context: Context) {
     private val spatialCue = SpatialCueEngine(AudioCuePlayer(), HapticCuePlayer(context))
     private val engine = HazardEngine()
     private val heuristic = HeuristicVisionRuntime()
-    private val executorch = ExecuTorchVisionRuntime()
+    private val executorch = ExecuTorchDetector(context)
 
     // --- Voice (offline) ---
     private val recognizer = OfflineSpeechRecognizer(context)
@@ -71,7 +71,7 @@ class ObservaController(context: Context) {
     val brailleStatus: String get() = router.brailleStatus.text
     val backendName: String get() = if (demoMode) "Demo (simulated)" else heuristic.name
     val backendStatus: String get() = if (demoMode) "scripted events" else heuristic.status.label
-    val executorchStatus: String get() = "${executorch.name}: ${executorch.status.label}"
+    val executorchStatus: String get() = "${executorch.name}: ${executorch.status.label} (${executorch.detail})"
     val privacyLabel: String = "Local only · No network required"
     val ttsReady: Boolean get() = speaker.ready
     val hapticsAvailable: Boolean get() = spatialCue.hapticsAvailable
