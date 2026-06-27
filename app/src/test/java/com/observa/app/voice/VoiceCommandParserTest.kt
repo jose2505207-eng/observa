@@ -50,6 +50,13 @@ class VoiceCommandParserTest {
         assertTrue(parser.parse("speak").intent is CommandIntent.Unmute)
     }
 
+    @Test fun brailleOnOffStatusParse() {
+        assertTrue(parser.parse("braille on").intent is CommandIntent.BrailleOn)
+        assertTrue(parser.parse("braille off").intent is CommandIntent.BrailleOff)
+        assertTrue(parser.parse("braille status").intent is CommandIntent.BrailleStatus)
+        assertTrue(parser.parse("braille").intent is CommandIntent.BrailleStatus)
+    }
+
     @Test fun caseInsensitiveAndTolerant() {
         assertTrue(parser.parse("  START OBSERVING please ").intent is CommandIntent.Start)
     }

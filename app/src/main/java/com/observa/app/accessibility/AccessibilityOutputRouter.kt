@@ -17,6 +17,9 @@ class AccessibilityOutputRouter(
 ) {
     val muted: Boolean get() = speaker.muted
 
+    /** When false, the Braille/live-region status stops updating; speech is unaffected. */
+    @Volatile var brailleEnabled: Boolean = true
+
     fun setMuted(muted: Boolean) {
         speaker.muted = muted
         if (muted) speaker.stop()
@@ -24,10 +27,18 @@ class AccessibilityOutputRouter(
 
     fun emit(event: OutputEvent, nowMs: Long = System.currentTimeMillis()) {
         if (!event.urgent && !throttler.shouldEmit(event.braille, nowMs)) return
-        brailleStatus.update(event.braille)
+        if (brailleEnabled) brailleStatus.update(event.braille)
         lastMessageStore.set(event.speech)
         speaker.speak(event.speech, urgent = event.urgent)
     }
+
+    /** Set the ambient composite status line (no speech). Respects [brailleEnabled]. */
+    fun setStatusLine(text: String) {
+        if (brailleEnabled) brailleStatus.update(text)
+    }
+
+    /** Force the status line regardless of [brailleEnabled] (used to show "Braille off"). */
+    fun forceStatusLine(text: String) = brailleStatus.update(text)
 
     /** Replay the last meaningful message (the "Repeat" action). */
     fun repeatLast() {

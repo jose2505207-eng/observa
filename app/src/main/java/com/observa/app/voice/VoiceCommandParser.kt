@@ -22,6 +22,11 @@ class VoiceCommandParser {
         phrase(text, "what is ahead", "what's ahead", "ahead")?.let { return it.to(CommandIntent.WhatIsAhead) }
         phrase(text, "where am i", "my location")?.let { return it.to(CommandIntent.WhereAmI) }
 
+        // Braille phrases: on/off before the broader "braille"/"braille status" match.
+        phrase(text, "braille on", "enable braille")?.let { return it.to(CommandIntent.BrailleOn) }
+        phrase(text, "braille off", "disable braille")?.let { return it.to(CommandIntent.BrailleOff) }
+        phrase(text, "braille status", "braille")?.let { return it.to(CommandIntent.BrailleStatus) }
+
         word(text, "start", "begin", "resume")?.let { return it.to(CommandIntent.Start) }
         word(text, "stop", "pause")?.let { return it.to(CommandIntent.Stop) }
         word(text, "help", "commands")?.let { return it.to(CommandIntent.Help) }

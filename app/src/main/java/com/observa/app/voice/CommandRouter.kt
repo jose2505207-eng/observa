@@ -15,6 +15,9 @@ interface CommandActions {
     fun cancel()
     fun mute()
     fun unmute()
+    fun brailleOn()
+    fun brailleOff()
+    fun brailleStatus()
 
     /** Short spoken/braille feedback for parser-level events (unrecognized, confirmation). */
     fun confirm(message: String)
@@ -50,6 +53,7 @@ class CommandRouter(
             // Safety / always-available commands bypass confirmation.
             is CommandIntent.Stop, is CommandIntent.Cancel,
             is CommandIntent.Mute, is CommandIntent.Unmute,
+            is CommandIntent.BrailleOn, is CommandIntent.BrailleOff, is CommandIntent.BrailleStatus,
             is CommandIntent.Help, is CommandIntent.Repeat -> execute(intent)
             else -> {
                 if (parsed.confidence < confidenceThreshold) {
@@ -77,6 +81,9 @@ class CommandRouter(
             is CommandIntent.Cancel -> actions.cancel()
             is CommandIntent.Mute -> actions.mute()
             is CommandIntent.Unmute -> actions.unmute()
+            is CommandIntent.BrailleOn -> actions.brailleOn()
+            is CommandIntent.BrailleOff -> actions.brailleOff()
+            is CommandIntent.BrailleStatus -> actions.brailleStatus()
             is CommandIntent.Yes, is CommandIntent.No -> actions.confirm("Nothing to confirm.")
             is CommandIntent.Unknown -> actions.confirm("Command not recognized. Say help.")
         }

@@ -7,6 +7,8 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.observa.app.accessibility.AccessibilityOutputRouter
+import com.observa.app.accessibility.BrailleSnapshot
+import com.observa.app.accessibility.BrailleStatusPresenter
 import com.observa.app.accessibility.OutputEvent
 import com.observa.app.accessibility.OutputPriority
 import com.observa.app.cue.AudioCuePlayer
@@ -71,6 +73,7 @@ class ObservaController(context: Context) {
     var cooldownNote by mutableStateOf("idle"); private set
     var voiceState by mutableStateOf("Voice idle"); private set
     var listening by mutableStateOf(false); private set
+    var brailleEnabled by mutableStateOf(true); private set
     val alerts = mutableStateListOf<String>()
 
     val brailleStatus: String get() = router.brailleStatus.text
@@ -120,6 +123,7 @@ class ObservaController(context: Context) {
     fun setMute(value: Boolean) {
         muted = value
         router.setMuted(value)
+        updateBrailleStatus()
     }
 
     fun toggleMute() = setMute(!muted)
@@ -128,9 +132,29 @@ class ObservaController(context: Context) {
     fun observe(value: Boolean) {
         observing = value
         respond(if (value) "Observing on." else "Observing off.")
+        updateBrailleStatus()
     }
 
     fun toggleObserving() = observe(!observing)
+
+    /** Single source of truth for Braille output — shared by the UI toggle and voice. */
+    fun setBraille(value: Boolean) {
+        brailleEnabled = value
+        router.brailleEnabled = value
+        if (value) updateBrailleStatus() else router.forceStatusLine("Braille off.")
+        respond(if (value) "Braille on." else "Braille off.")
+    }
+
+    fun toggleBraille() = setBraille(!brailleEnabled)
+
+    /** Speak + show the current concise Braille status line (the "braille status" command). */
+    fun announceBrailleStatus() = respond(currentBrailleLine())
+
+    private fun currentBrailleLine(): String =
+        BrailleStatusPresenter.format(BrailleSnapshot(observing, muted, executorch.status.label))
+
+    /** Refresh the ambient composite Braille/live-region line from current state. */
+    private fun updateBrailleStatus() = router.setStatusLine(currentBrailleLine())
 
     fun onMicPressed() = pushToTalk.onPressed()
     fun onMicReleased() = pushToTalk.onReleased()
@@ -144,6 +168,7 @@ class ObservaController(context: Context) {
         if (!modelInitialized) {
             withContext(Dispatchers.IO) { executorch.initialize(appContext) }
             modelInitialized = true
+            updateBrailleStatus()
         }
         while (coroutineContext.isActive) {
             frameCount = rawFrameCount
@@ -271,6 +296,9 @@ class ObservaController(context: Context) {
         override fun cancel() = respond("Cancelled.")
         override fun mute() { setMute(true); respond("Muted.") }
         override fun unmute() { setMute(false); respond("Speech on.") }
+        override fun brailleOn() = setBraille(true)
+        override fun brailleOff() = setBraille(false)
+        override fun brailleStatus() = announceBrailleStatus()
         override fun confirm(message: String) = respond(message)
     }
 }

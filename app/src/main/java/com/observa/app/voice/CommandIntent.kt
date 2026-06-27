@@ -15,6 +15,9 @@ sealed class CommandIntent {
     object Cancel : CommandIntent()
     object Mute : CommandIntent()
     object Unmute : CommandIntent()
+    object BrailleOn : CommandIntent()
+    object BrailleOff : CommandIntent()
+    object BrailleStatus : CommandIntent()
     object Yes : CommandIntent()
     object No : CommandIntent()
 

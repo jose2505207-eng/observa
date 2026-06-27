@@ -96,6 +96,7 @@ private fun BrailleStatus(status: String) {
             .fillMaxWidth()
             .background(Panel, RoundedCornerShape(12.dp))
             .padding(12.dp)
+            .testTag("brailleStatus")
             .semantics {
                 liveRegion = LiveRegionMode.Polite
                 contentDescription = "Status: $status"
@@ -284,6 +285,25 @@ private fun Controls(controller: ObservaController) {
     ) {
         Text("Observing", color = OnDark, fontSize = 20.sp, fontWeight = FontWeight.Bold)
         Switch(checked = controller.observing, onCheckedChange = { controller.observe(it) })
+    }
+    Spacer(Modifier.height(8.dp))
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Panel, RoundedCornerShape(12.dp))
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .testTag("brailleToggle")
+            .semantics(mergeDescendants = true) {
+                contentDescription = if (controller.brailleEnabled)
+                    "Braille status on. Double tap to turn off."
+                else
+                    "Braille status off. Double tap to turn on."
+            },
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("Braille status", color = OnDark, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Switch(checked = controller.brailleEnabled, onCheckedChange = { controller.setBraille(it) })
     }
     Spacer(Modifier.height(8.dp))
     Button(
