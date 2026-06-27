@@ -6,15 +6,20 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import android.graphics.Bitmap
 import com.observa.app.accessibility.AccessibilityOutputRouter
 import com.observa.app.accessibility.BrailleSnapshot
 import com.observa.app.accessibility.BrailleStatusPresenter
+import com.observa.app.accessibility.CueDirection
 import com.observa.app.accessibility.OutputEvent
 import com.observa.app.accessibility.OutputPriority
+import com.observa.app.ocr.OcrEngine
+import com.observa.app.ocr.MlKitOcrEngine
 import com.observa.app.cue.AudioCuePlayer
 import com.observa.app.cue.HapticCuePlayer
 import com.observa.app.cue.SpatialCueEngine
 import com.observa.app.demo.DemoScript
+import com.observa.app.hazard.Direction
 import com.observa.app.hazard.FrameInput
 import com.observa.app.hazard.Hazard
 import com.observa.app.hazard.HazardEngine
@@ -28,9 +33,13 @@ import com.observa.app.voice.CommandRouter
 import com.observa.app.voice.OfflineSpeechRecognizer
 import com.observa.app.voice.PushToTalkController
 import com.observa.app.voice.VoiceCommandParser
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.coroutineContext
 
@@ -46,13 +55,21 @@ import kotlin.coroutines.coroutineContext
 class ObservaController(context: Context) {
 
     private val speaker = Speaker(context)
-    private val router = AccessibilityOutputRouter(speaker)
     private val spatialCue = SpatialCueEngine(AudioCuePlayer(), HapticCuePlayer(context))
+    private val router = AccessibilityOutputRouter(speaker, cueSink = spatialCue)
     private val engine = HazardEngine()
     private val heuristic = HeuristicVisionRuntime()
     private val executorch = ExecuTorchDetector()
+    private val ocr: OcrEngine = MlKitOcrEngine()
     private val appContext = context.applicationContext
+    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     @Volatile private var modelInitialized = false
+
+    // --- OCR on-demand capture (one-shot bitmap handed by the analyzer) ---
+    @Volatile private var ocrCapturePending = false
+    @Volatile private var pendingOcrBitmap: Bitmap? = null
+    val wantsOcrCapture: Boolean get() = ocrCapturePending
+    val ocrAvailable: Boolean get() = ocr.ready
 
     // --- Voice (offline) ---
     private val recognizer = OfflineSpeechRecognizer(context)
@@ -74,6 +91,8 @@ class ObservaController(context: Context) {
     var voiceState by mutableStateOf("Voice idle"); private set
     var listening by mutableStateOf(false); private set
     var brailleEnabled by mutableStateOf(true); private set
+    var audioCuesEnabled by mutableStateOf(true); private set
+    var hapticCuesEnabled by mutableStateOf(true); private set
     val alerts = mutableStateListOf<String>()
 
     val brailleStatus: String get() = router.brailleStatus.text
@@ -147,8 +166,67 @@ class ObservaController(context: Context) {
 
     fun toggleBraille() = setBraille(!brailleEnabled)
 
+    /** Audio cue on/off (safety cues remain independent of speech mute). */
+    fun setAudioCues(value: Boolean) {
+        audioCuesEnabled = value
+        spatialCue.audioEnabled = value
+        respond(if (value) "Audio cues on." else "Audio cues off.")
+    }
+
+    /** Directional haptic on/off. */
+    fun setHapticCues(value: Boolean) {
+        hapticCuesEnabled = value
+        spatialCue.hapticsEnabled = value
+        respond(if (value) "Haptics on." else "Haptics off.")
+    }
+
     /** Speak + show the current concise Braille status line (the "braille status" command). */
     fun announceBrailleStatus() = respond(currentBrailleLine())
+
+    /**
+     * Capture one camera frame and run offline OCR on demand. Declines honestly if OCR is not
+     * available, says "No readable text found." when appropriate, and never runs continuously.
+     */
+    fun readText() {
+        if (!ocr.ready) { respond("Text reading is unavailable."); return }
+        respond("Reading text…")
+        pendingOcrBitmap = null
+        ocrCapturePending = true
+        scope.launch {
+            val bmp = awaitOcrBitmap()
+            ocrCapturePending = false
+            if (bmp == null) { respond("Could not capture an image."); return@launch }
+            val result = withContext(Dispatchers.Default) { ocr.recognize(bmp) }
+            bmp.recycle()
+            emitOcr(result.message)
+        }
+    }
+
+    /** Called from the analyzer thread with a one-shot bitmap when [wantsOcrCapture] is set. */
+    fun submitOcrFrame(bitmap: Bitmap) {
+        pendingOcrBitmap = bitmap
+        ocrCapturePending = false
+    }
+
+    private suspend fun awaitOcrBitmap(): Bitmap? {
+        repeat(30) { // up to ~1.5s for a fresh frame
+            pendingOcrBitmap?.let { return it }
+            delay(50)
+        }
+        return pendingOcrBitmap
+    }
+
+    private fun emitOcr(message: String) {
+        voiceState = message
+        router.emit(
+            OutputEvent(
+                priority = OutputPriority.OCR,
+                speech = message,
+                braille = if (message.length > 60) message.take(57) + "…" else message,
+                urgent = false,
+            )
+        )
+    }
 
     private fun currentBrailleLine(): String =
         BrailleStatusPresenter.format(BrailleSnapshot(observing, muted, executorch.status.label))
@@ -224,15 +302,24 @@ class ObservaController(context: Context) {
         alerts.add(0, line)
         if (alerts.size > 6) alerts.removeAt(alerts.size - 1)
         val urgent = hazard.severity == Severity.HIGH
+        // The router fans this to speech + Braille + the audio/haptic cue sink (cues fire even when
+        // speech is muted, for safety). Direction steers panning/directional haptics.
         router.emit(
             OutputEvent(
                 priority = if (urgent) OutputPriority.HAZARD else OutputPriority.NAVIGATION,
                 speech = hazard.message,
                 braille = line,
+                direction = cueDirectionOf(hazard.direction),
+                timestampMs = hazard.timestampMs,
             )
         )
-        // Non-speech spatial cues stay on even when speech is muted (safety).
-        spatialCue.cue(hazard, System.currentTimeMillis())
+    }
+
+    private fun cueDirectionOf(d: Direction): CueDirection = when (d) {
+        Direction.LEFT -> CueDirection.LEFT
+        Direction.RIGHT -> CueDirection.RIGHT
+        Direction.CENTER -> CueDirection.CENTER
+        Direction.UNKNOWN -> CueDirection.NONE
     }
 
     /** On-demand spoken/braille response that bypasses the per-message throttle. */
@@ -275,9 +362,11 @@ class ObservaController(context: Context) {
     }
 
     fun shutdown() {
+        scope.cancel()
         recognizer.destroy()
         spatialCue.release()
         executorch.close()
+        ocr.close()
         speaker.shutdown()
     }
 
@@ -287,7 +376,7 @@ class ObservaController(context: Context) {
         override fun stop() = observe(false)
         override fun help() = speakHelp()
         override fun repeat() = router.repeatLast()
-        override fun readText() = respond("Text reading is not available offline yet.")
+        override fun readText() = this@ObservaController.readText()
         override fun describeScene() = this@ObservaController.describeScene()
         override fun navigateTo(destination: String) = respond("Navigation is not available yet.")
         override fun find(target: String) = respond("Object finding is not available yet.")

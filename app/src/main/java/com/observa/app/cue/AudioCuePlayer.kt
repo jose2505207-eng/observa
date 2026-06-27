@@ -19,10 +19,18 @@ class AudioCuePlayer {
 
     /** @param pan -1f (left) .. +1f (right); urgent uses a higher, longer tone. */
     fun playCue(pan: Float, urgent: Boolean) {
+        playTone(pan, if (urgent) 880.0 else 440.0, if (urgent) 240 else 110)
+    }
+
+    /** Short, pleasant rising confirmation beep (centered). */
+    fun playConfirmation() = playTone(0f, 660.0, 80)
+
+    /** Low, longer error tone (centered). */
+    fun playError() = playTone(0f, 200.0, 220)
+
+    private fun playTone(pan: Float, freq: Double, durationMs: Int) {
         executor.execute {
             try {
-                val durationMs = if (urgent) 240 else 110
-                val freq = if (urgent) 880.0 else 440.0
                 val data = synthesize(pan.coerceIn(-1f, 1f), freq, durationMs)
                 val track = AudioTrack.Builder()
                     .setAudioAttributes(

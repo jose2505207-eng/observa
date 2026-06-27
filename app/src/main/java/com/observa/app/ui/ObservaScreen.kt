@@ -1,5 +1,7 @@
 package com.observa.app.ui
 
+import android.graphics.Bitmap
+import android.graphics.Matrix
 import android.util.Log
 import android.view.ViewGroup
 import androidx.camera.core.CameraSelector
@@ -91,6 +93,26 @@ fun ObservaScreen(controller: ObservaController) {
     }
 }
 
+/** A labeled, TalkBack-friendly on/off toggle row with a stable test tag. */
+@Composable
+private fun ToggleRow(label: String, checked: Boolean, testTag: String, onChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Panel, RoundedCornerShape(12.dp))
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .testTag(testTag)
+            .semantics(mergeDescendants = true) {
+                contentDescription = "$label ${if (checked) "on" else "off"}. Double tap to toggle."
+            },
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, color = OnDark, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Switch(checked = checked, onCheckedChange = onChange)
+    }
+}
+
 /** Braille-friendly status as a polite TalkBack live region (drives a connected braille display). */
 @Composable
 private fun BrailleStatus(status: String) {
@@ -146,6 +168,9 @@ private fun CameraPanel(controller: ObservaController, modifier: Modifier) {
                                 a.setAnalyzer(analysisExecutor) { proxy ->
                                     try {
                                         controller.submitFrame(proxy.toFrameInput(controller.modelNeedsPixels))
+                                        if (controller.wantsOcrCapture) {
+                                            controller.submitOcrFrame(proxy.toBitmap())
+                                        }
                                     } finally {
                                         proxy.close()
                                     }
@@ -309,6 +334,37 @@ private fun Controls(controller: ObservaController) {
         Switch(checked = controller.brailleEnabled, onCheckedChange = { controller.setBraille(it) })
     }
     Spacer(Modifier.height(8.dp))
+    ToggleRow(
+        label = "Audio cues",
+        checked = controller.audioCuesEnabled,
+        testTag = "audioToggle",
+        onChange = { controller.setAudioCues(it) },
+    )
+    Spacer(Modifier.height(8.dp))
+    ToggleRow(
+        label = "Haptics",
+        checked = controller.hapticCuesEnabled,
+        testTag = "hapticsToggle",
+        onChange = { controller.setHapticCues(it) },
+    )
+    Spacer(Modifier.height(8.dp))
+    Button(
+        onClick = { controller.readText() },
+        enabled = controller.ocrAvailable,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(64.dp)
+            .testTag("readTextButton")
+            .semantics {
+                contentDescription = if (controller.ocrAvailable)
+                    "Read text. Point the camera at text and double tap to read it aloud."
+                else "Read text unavailable."
+            },
+        colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Bg),
+    ) {
+        Text("Read Text", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+    }
+    Spacer(Modifier.height(8.dp))
     Button(
         onClick = { controller.onMicPressed() },
         enabled = controller.voiceAvailable,
@@ -394,6 +450,36 @@ private fun ImageProxy.toFrameInput(capturePixels: Boolean): FrameInput {
  * [outW]x[outH] via nearest-neighbor sampling, using the standard BT.601 YUV→RGB transform.
  * Returns null on any plane/format surprise (caller falls back to no detections, never crashes).
  */
+/**
+ * Convert this YUV_420_888 frame to an upright ARGB [Bitmap] (BT.601) for on-demand OCR. Applies
+ * the frame's rotation so text is upright. In-process only; the bitmap is recycled after OCR.
+ */
+private fun ImageProxy.toBitmap(): Bitmap {
+    val w = width
+    val h = height
+    val yP = planes[0]; val uP = planes[1]; val vP = planes[2]
+    val yBuf = yP.buffer; val uBuf = uP.buffer; val vBuf = vP.buffer
+    val argb = IntArray(w * h)
+    for (j in 0 until h) {
+        for (i in 0 until w) {
+            val yIdx = j * yP.rowStride + i * yP.pixelStride
+            val uvIdx = (j / 2) * uP.rowStride + (i / 2) * uP.pixelStride
+            val y = if (yIdx < yBuf.capacity()) yBuf.get(yIdx).toInt() and 0xFF else 0
+            val u = if (uvIdx < uBuf.capacity()) (uBuf.get(uvIdx).toInt() and 0xFF) - 128 else 0
+            val v = if (uvIdx < vBuf.capacity()) (vBuf.get(uvIdx).toInt() and 0xFF) - 128 else 0
+            val r = (y + 1.402f * v).toInt().coerceIn(0, 255)
+            val g = (y - 0.344f * u - 0.714f * v).toInt().coerceIn(0, 255)
+            val b = (y + 1.772f * u).toInt().coerceIn(0, 255)
+            argb[j * w + i] = (0xFF shl 24) or (r shl 16) or (g shl 8) or b
+        }
+    }
+    val bmp = Bitmap.createBitmap(argb, w, h, Bitmap.Config.ARGB_8888)
+    val rotation = imageInfo.rotationDegrees
+    if (rotation == 0) return bmp
+    val m = Matrix().apply { postRotate(rotation.toFloat()) }
+    return Bitmap.createBitmap(bmp, 0, 0, w, h, m, true)
+}
+
 private fun ImageProxy.toRgbFloats(outW: Int, outH: Int): FloatArray? = try {
     val yP = planes[0]; val uP = planes[1]; val vP = planes[2]
     val yBuf = yP.buffer; val uBuf = uP.buffer; val vBuf = vP.buffer

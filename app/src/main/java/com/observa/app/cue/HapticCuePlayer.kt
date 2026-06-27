@@ -5,6 +5,7 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import com.observa.app.accessibility.CueDirection
 import com.observa.app.hazard.Direction
 import com.observa.app.hazard.Hazard
 import com.observa.app.hazard.Severity
@@ -38,6 +39,30 @@ class HapticCuePlayer(context: Context) {
             hazard.direction == Direction.LEFT -> leftPulse()
             hazard.direction == Direction.RIGHT -> rightPulse()
             else -> forwardHazard()
+        }
+    }
+
+    /** Play a directional/urgency pattern. */
+    fun forDirection(direction: CueDirection, urgent: Boolean) {
+        when (selectPattern(direction, urgent)) {
+            HapticPattern.STOP -> escalatingStop()
+            HapticPattern.LEFT -> leftPulse()
+            HapticPattern.RIGHT -> rightPulse()
+            HapticPattern.FORWARD -> forwardHazard()
+            HapticPattern.CONFIRM -> confirmation()
+            HapticPattern.ERROR -> error()
+        }
+    }
+
+    /** Logical haptic patterns; selection is pure (no Android deps) so it is unit-testable. */
+    enum class HapticPattern { LEFT, RIGHT, FORWARD, STOP, CONFIRM, ERROR }
+
+    companion object {
+        fun selectPattern(direction: CueDirection, urgent: Boolean): HapticPattern = when {
+            urgent -> HapticPattern.STOP
+            direction == CueDirection.LEFT -> HapticPattern.LEFT
+            direction == CueDirection.RIGHT -> HapticPattern.RIGHT
+            else -> HapticPattern.FORWARD
         }
     }
 

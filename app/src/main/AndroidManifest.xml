@@ -12,6 +12,15 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
 
+    <!--
+      OBSERVA is offline by design. ML Kit (bundled on-device OCR model) and some
+      transitive libraries declare INTERNET / ACCESS_NETWORK_STATE for optional
+      telemetry; OCR inference does NOT need them. Strip them at merge time so the
+      app physically cannot use the network. OCR still runs fully on device.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove" />
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"

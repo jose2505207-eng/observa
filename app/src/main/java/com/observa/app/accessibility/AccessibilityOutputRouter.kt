@@ -14,6 +14,7 @@ class AccessibilityOutputRouter(
     val brailleStatus: BrailleStatusState = BrailleStatusState(),
     private val lastMessageStore: LastMessageStore = LastMessageStore(),
     private val throttler: OutputThrottler = OutputThrottler(1_200L),
+    private val cueSink: CueSink? = null,
 ) {
     val muted: Boolean get() = speaker.muted
 
@@ -25,11 +26,20 @@ class AccessibilityOutputRouter(
         if (muted) speaker.stop()
     }
 
+    /**
+     * Fan an event to every channel: TTS, Braille/live-region, repeat store, and audio/haptic cues.
+     * HAZARD events are urgent → they flush the speech queue (interrupting OCR/navigation/speech)
+     * and always update Braille and fire a cue; lower-priority events queue behind and are
+     * debounced, so they never interrupt a hazard. Non-speech cues fire even when speech is muted.
+     */
     fun emit(event: OutputEvent, nowMs: Long = System.currentTimeMillis()) {
         if (!event.urgent && !throttler.shouldEmit(event.braille, nowMs)) return
         if (brailleEnabled) brailleStatus.update(event.braille)
         lastMessageStore.set(event.speech)
         speaker.speak(event.speech, urgent = event.urgent)
+        if (event.priority == OutputPriority.HAZARD || event.priority == OutputPriority.NAVIGATION) {
+            cueSink?.hazardCue(event.direction, event.urgent, nowMs)
+        }
     }
 
     /** Set the ambient composite status line (no speech). Respects [brailleEnabled]. */
