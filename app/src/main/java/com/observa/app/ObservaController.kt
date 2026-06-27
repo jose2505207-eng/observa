@@ -114,6 +114,14 @@ class ObservaController(context: Context) {
 
     fun toggleMute() = setMute(!muted)
 
+    /** Single source of truth for the observing state — shared by the UI toggle and voice. */
+    fun observe(value: Boolean) {
+        observing = value
+        respond(if (value) "Observing on." else "Observing off.")
+    }
+
+    fun toggleObserving() = observe(!observing)
+
     fun onMicPressed() = pushToTalk.onPressed()
     fun onMicReleased() = pushToTalk.onReleased()
 
@@ -229,8 +237,8 @@ class ObservaController(context: Context) {
 
     /** Bridges parsed voice commands to controller behavior. Honest about what is not built yet. */
     private inner class VoiceActions : CommandActions {
-        override fun start() { observing = true; respond("Observing on.") }
-        override fun stop() { observing = false; respond("Observing off.") }
+        override fun start() = observe(true)
+        override fun stop() = observe(false)
         override fun help() = speakHelp()
         override fun repeat() = router.repeatLast()
         override fun readText() = respond("Text reading is not available offline yet.")

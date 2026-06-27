@@ -18,9 +18,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -31,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
@@ -58,6 +61,7 @@ fun ObservaScreen(controller: ObservaController) {
         modifier = Modifier
             .fillMaxSize()
             .background(Bg)
+            .safeDrawingPadding() // keep content clear of status bar + gesture nav bar
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -257,6 +261,25 @@ private fun Controls(controller: ObservaController) {
         ) {
             Text(if (controller.muted) "Unmute" else "Mute", fontSize = 20.sp, fontWeight = FontWeight.Bold)
         }
+    }
+    Spacer(Modifier.height(8.dp))
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Panel, RoundedCornerShape(12.dp))
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .testTag("observingToggle")
+            .semantics(mergeDescendants = true) {
+                contentDescription = if (controller.observing)
+                    "Observing on. Double tap to stop observing."
+                else
+                    "Observing off. Double tap to start observing."
+            },
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("Observing", color = OnDark, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Switch(checked = controller.observing, onCheckedChange = { controller.observe(it) })
     }
     Spacer(Modifier.height(8.dp))
     Button(
