@@ -10,34 +10,35 @@ OBSERVA never downloads models or sends frames anywhere.
 `ExecuTorchDetector` looks for exactly this path (`models/observa_detector.pte`),
 copies it to internal storage, and calls `Module.load(...)`.
 
-## Assumed input contract (preprocessing)
+## Input contract (preprocessing)
 
-`ExecuTorchDetector.preprocess` currently produces:
+`ExecuTorchDetector.preprocess` produces (YOLOv8 default):
 
 - dtype: `float32`
-- shape: `[1, 3, 224, 224]` (NCHW)
+- shape: `[1, 3, 640, 640]` (NCHW)
 - channel order: **RGB**
 - normalization: **0..1** (pixel / 255)
 
-If your model expects a different size, layout, or normalization (e.g. mean/std
-or `[1, 224, 224, 3]` NHWC), update `inputWidth`/`inputHeight` and `preprocess`
-and document the change here.
+For a different size/layout/normalization, change `inputWidth`/`inputHeight` (and
+`preprocess`) and update this file.
 
 ## Output contract (parsing)
 
-The output is parsed **only** through a `DetectionParser`. The default
-`StrictUnknownShapeParser` **refuses to emit any label** and just logs the
-observed output tensor shapes (look for `OBSERVA_MODEL` in logcat). This is
-deliberate: the app will **not** speak object labels (“person”, “stairs”,
-“crosswalk”, …) until a model-specific parser is written and verified against the
-real output shapes on device.
+The default parser is now **`YoloDetectionParser`**, which understands a YOLO single
+output tensor `[1, 84, 8400]` (cx,cy,w,h in 0..640 + 80 COCO class probs), and also
+`[1, N, 84]` and the `+1` objectness variant. It thresholds (0.40), runs class-aware
+NMS (IoU 0.45), maps COCO → safety categories, and computes left/center/right.
 
-To enable real detections you must:
+For any **unrecognized** output shape it returns empty — it never fabricates labels.
+(`StrictUnknownShapeParser` remains available as the most conservative default.)
 
-1. Bundle a valid `observa_detector.pte`.
-2. Read the logged output shapes from `OBSERVA_MODEL`.
-3. Implement a `DetectionParser` for that exact format (boxes/scores/labels) and a
-   labels file if the model emits class indices.
+To enable real detections:
+
+1. Bundle a valid `observa_detector.pte` (see `scripts/export_detector.py` and
+   `docs/real-detector.md`).
+2. Read the logged output shapes from `OBSERVA_MODEL`; confirm the parser matches.
+3. Optionally add `observa_detector.pte.version` (a short text sidecar) — it is shown
+   in diagnostics.
 4. Verify on device before claiming object recognition.
 
 ## Acceleration (QNN)
