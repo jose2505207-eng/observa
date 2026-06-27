@@ -4,6 +4,43 @@ Newest entries first. Append an entry whenever you make a meaningful change to t
 
 ---
 
+## 2026-06-27 — Post-crash recovery + voice/cue/model integration
+
+Recovered uncommitted work from a laptop crash (4 untracked packages,
+no tracked files modified, no conflict artifacts) and integrated it.
+Built after each step (`./gradlew assembleDebug` SUCCESSFUL). Branch:
+`recover/post-crash-voice-cues`.
+
+- **Recovered & checkpointed** `accessibility/`, `cue/`, `voice/`,
+  `nav/` (all compiled clean but were unwired).
+- **Accessibility output** (`AccessibilityOutputRouter`): hazards now fan
+  out to speech + a braille-friendly **polite live region** + a
+  last-message store for "Repeat", with per-message rate limiting.
+- **Spatial cues** (`SpatialCueEngine`): synthesized stereo-panned audio
+  (`AudioTrack`, in-memory, offline) + **directional haptic patterns**
+  (left/right/forward/urgent). Non-speech cues stay on when speech is
+  muted (safety).
+- **Offline voice control**: `OfflineSpeechRecognizer` (prefers on-device
+  ASR, `EXTRA_PREFER_OFFLINE`) + deterministic `VoiceCommandParser` +
+  `CommandRouter` (low-confidence confirmation) + `PushToTalkController`,
+  bridged via `VoiceActions`. Commands: start/stop observing, describe
+  scene, what is ahead, read text, repeat, mute/unmute, help. Unbuilt
+  capabilities (navigate/find/where-am-I/read-text) answer **honestly**.
+- **Observing toggle** gates the live heuristic; **describe scene / what
+  is ahead** give an honest brightness summary (no vision model yet).
+- **Model scaffolding (P5)**: `assets/models/` + `ExecuTorchDetector`
+  (validates whether a `.pte` is bundled; `NOT_CONNECTED`/`BUNDLED_NOT_
+  INVOKED`, never fabricates detections) + `QnnRuntimeChecker` (detects
+  QNN native libs; CPU fallback when absent). Clear logcat
+  (`OBSERVA_EXECUTORCH` / `OBSERVA_QNN`). Removed superseded
+  `ExecuTorchVisionRuntime` stub.
+- `MainActivity` requests optional `RECORD_AUDIO` and inits voice; camera
+  still gates the app.
+
+**Still not done:** real ExecuTorch/QNN inference, object-detection
+model, OCR/text reading, GPS/navigation, on-device device-verified run of
+this build.
+
 ## 2026-06-27 — P0 demo app implemented & verified on device
 
 - Merged `auto/wiki-operating-system` into `main` (app baseline + team operating system), built and pushed.
