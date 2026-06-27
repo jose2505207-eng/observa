@@ -26,7 +26,15 @@ data class Detection(
     val direction: Direction = Direction.UNKNOWN,
 )
 
-/** Per-frame summary the analyzer hands to a runtime (no raw pixels leave the analyzer). */
+/**
+ * Per-frame summary the analyzer hands to a runtime. The luminance summary is always present and
+ * is all the heuristic needs (no pixels leave the analyzer for that path).
+ *
+ * [rgb] is an OPTIONAL, on-device-only, interleaved RGB float buffer (values 0..1, row-major,
+ * length = rgbWidth * rgbHeight * 3). It is populated *only* when a real ML model is loaded and
+ * needs pixels; otherwise it stays null and the heuristic path runs exactly as before. Pixels are
+ * used in-process for inference and never stored or transmitted.
+ */
 data class FrameInput(
     val width: Int,
     val height: Int,
@@ -34,6 +42,9 @@ data class FrameInput(
     val centerLuma: Float,
     val rightLuma: Float,
     val avgLuma: Float,
+    val rgb: FloatArray? = null,
+    val rgbWidth: Int = 0,
+    val rgbHeight: Int = 0,
 )
 
 /** A user-facing alert after the [HazardEngine] has mapped and gated detections. */

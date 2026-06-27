@@ -3,43 +3,56 @@ package com.observa.app.runtime
 import android.content.Context
 import android.util.Log
 import java.io.File
+import java.util.zip.ZipFile
 
-/** Truthful QNN/NPU acceleration availability. Never claims acceleration we cannot prove. */
+/**
+ * Truthful QNN availability. Detecting the delegate library is NOT the same as acceleration:
+ * QNN is only "active" if the *loaded model's* method actually runs on a QNN backend (checked at
+ * load time via MethodMetadata.getBackends()). This checker therefore only reports whether the
+ * ExecuTorch QNN *delegate* native library is packaged — never that acceleration is happening.
+ */
 enum class QnnStatus(val label: String) {
-    AVAILABLE("QNN libraries present"),
-    NOT_PRESENT("QNN absent (CPU fallback)"),
+    DELEGATE_PRESENT("QNN delegate present (not active)"),
+    NOT_PRESENT("QNN absent (CPU)"),
     UNKNOWN("not checked"),
 }
 
-/**
- * Detects whether Qualcomm QNN (NPU) native libraries are actually packaged with the app, so the
- * dashboard can state acceleration honestly. This only checks for the libraries' presence — it
- * does not load or invoke them; that happens once real ExecuTorch inference is wired up.
- */
 object QnnRuntimeChecker {
 
     private const val TAG = "OBSERVA_QNN"
-
-    private val candidates = listOf(
-        "libQnnHtp.so",
-        "libQnnSystem.so",
-        "libqnn_executorch_backend.so",
-    )
+    private const val DELEGATE = "libqnn_executorch_backend.so"
 
     fun check(context: Context): QnnStatus {
         return try {
-            val libDir = context.applicationInfo.nativeLibraryDir
-            val found = candidates.filter { File(libDir, it).exists() }
-            if (found.isNotEmpty()) {
-                Log.i(TAG, "QNN libraries present: $found in $libDir")
-                QnnStatus.AVAILABLE
+            // On modern Android (extractNativeLibs=false) libs stay inside the APK and are NOT
+            // extracted to nativeLibraryDir, so a filesystem-only check would falsely report absent.
+            val onDisk = File(context.applicationInfo.nativeLibraryDir, DELEGATE).exists()
+            val inApk = apkContainsLib(context, DELEGATE)
+            if (onDisk || inApk) {
+                Log.i(
+                    TAG,
+                    "QNN delegate '$DELEGATE' present (onDisk=$onDisk, inApk=$inApk) but NOT active: " +
+                        "no QNN-delegated model is loaded.",
+                )
+                QnnStatus.DELEGATE_PRESENT
             } else {
-                Log.i(TAG, "No QNN libraries in $libDir — CPU fallback (looked for $candidates)")
+                Log.i(TAG, "QNN delegate '$DELEGATE' absent — CPU only.")
                 QnnStatus.NOT_PRESENT
             }
         } catch (e: Exception) {
             Log.e(TAG, "QNN check failed", e)
             QnnStatus.UNKNOWN
+        }
+    }
+
+    private fun apkContainsLib(context: Context, libName: String): Boolean {
+        val sourceDir = context.applicationInfo.sourceDir ?: return false
+        return try {
+            ZipFile(sourceDir).use { zip ->
+                zip.entries().asSequence().any { it.name.endsWith("/$libName") }
+            }
+        } catch (_: Exception) {
+            false
         }
     }
 }

@@ -20,13 +20,16 @@ import com.observa.app.hazard.Severity
 import com.observa.app.output.Speaker
 import com.observa.app.runtime.ExecuTorchDetector
 import com.observa.app.runtime.HeuristicVisionRuntime
+import com.observa.app.runtime.InferenceStatus
 import com.observa.app.voice.CommandActions
 import com.observa.app.voice.CommandRouter
 import com.observa.app.voice.OfflineSpeechRecognizer
 import com.observa.app.voice.PushToTalkController
 import com.observa.app.voice.VoiceCommandParser
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
 import kotlin.coroutines.coroutineContext
 
 /**
@@ -45,7 +48,9 @@ class ObservaController(context: Context) {
     private val spatialCue = SpatialCueEngine(AudioCuePlayer(), HapticCuePlayer(context))
     private val engine = HazardEngine()
     private val heuristic = HeuristicVisionRuntime()
-    private val executorch = ExecuTorchDetector(context)
+    private val executorch = ExecuTorchDetector()
+    private val appContext = context.applicationContext
+    @Volatile private var modelInitialized = false
 
     // --- Voice (offline) ---
     private val recognizer = OfflineSpeechRecognizer(context)
@@ -71,7 +76,12 @@ class ObservaController(context: Context) {
     val brailleStatus: String get() = router.brailleStatus.text
     val backendName: String get() = if (demoMode) "Demo (simulated)" else heuristic.name
     val backendStatus: String get() = if (demoMode) "scripted events" else heuristic.status.label
-    val executorchStatus: String get() = "${executorch.name}: ${executorch.status.label} (${executorch.detail})"
+    val aiModelStatus: String get() = "AI model: ${executorch.status.label}"
+    val aiModelDetail: String get() = executorch.detail
+    /** True only when a real model is loaded; gates pixel capture in the analyzer. */
+    val modelNeedsPixels: Boolean
+        get() = executorch.status == InferenceStatus.LOADED_CPU ||
+            executorch.status == InferenceStatus.LOADED_QNN
     val privacyLabel: String = "Local only · No network required"
     val ttsReady: Boolean get() = speaker.ready
     val hapticsAvailable: Boolean get() = spatialCue.hapticsAvailable
@@ -125,8 +135,16 @@ class ObservaController(context: Context) {
     fun onMicPressed() = pushToTalk.onPressed()
     fun onMicReleased() = pushToTalk.onReleased()
 
-    /** Main-thread loop: refresh metrics and (when observing and not in Demo Mode) run the heuristic. */
+    /**
+     * Main-thread loop: initialize the model once (off the UI thread), refresh metrics, and (when
+     * observing and not in Demo Mode) run the active detector — the ExecuTorch model if it loaded,
+     * otherwise the heuristic fallback. Inference runs off the UI thread.
+     */
     suspend fun runProcessingLoop() {
+        if (!modelInitialized) {
+            withContext(Dispatchers.IO) { executorch.initialize(appContext) }
+            modelInitialized = true
+        }
         while (coroutineContext.isActive) {
             frameCount = rawFrameCount
             fps = fpsValue
@@ -134,7 +152,9 @@ class ObservaController(context: Context) {
             if (!demoMode && observing) {
                 val frame = latestFrame
                 if (frame != null) {
-                    val detections = heuristic.analyzeFrame(frame)
+                    val detections = if (modelNeedsPixels)
+                        withContext(Dispatchers.Default) { executorch.analyzeFrame(frame) }
+                    else heuristic.analyzeFrame(frame)
                     val hazards = engine.process(detections, System.currentTimeMillis())
                     hazards.forEach { emit(it) }
                 }
@@ -232,6 +252,7 @@ class ObservaController(context: Context) {
     fun shutdown() {
         recognizer.destroy()
         spatialCue.release()
+        executorch.close()
         speaker.shutdown()
     }
 

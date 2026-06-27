@@ -141,7 +141,7 @@ private fun CameraPanel(controller: ObservaController, modifier: Modifier) {
                             .also { a ->
                                 a.setAnalyzer(analysisExecutor) { proxy ->
                                     try {
-                                        controller.submitFrame(proxy.toFrameInput())
+                                        controller.submitFrame(proxy.toFrameInput(controller.modelNeedsPixels))
                                     } finally {
                                         proxy.close()
                                     }
@@ -196,7 +196,11 @@ private fun Dashboard(controller: ObservaController) {
         StatRow("Frames", controller.frameCount.toString(), OnDark)
         StatRow("FPS", String.format("%.1f", controller.fps), OnDark)
         StatRow("Backend", "${controller.backendName} (${controller.backendStatus})", OnDark)
-        StatRow("Inference", controller.executorchStatus, OnDark)
+        StatRow(
+            "AI model",
+            controller.aiModelStatus.removePrefix("AI model: "),
+            if (controller.modelNeedsPixels) Good else Accent,
+        )
         StatRow("Alert cooldown", controller.cooldownNote, OnDark)
         StatRow("Observing", if (controller.observing) "On" else "Off", if (controller.observing) Good else Accent)
         StatRow("Demo Mode", if (controller.demoMode) "On" else "Off", if (controller.demoMode) Good else OnDark)
@@ -310,8 +314,15 @@ private fun Controls(controller: ObservaController) {
     Spacer(Modifier.height(4.dp))
 }
 
-/** Compute left/center/right and average luminance from the Y plane (no pixels are stored). */
-private fun ImageProxy.toFrameInput(): FrameInput {
+/** Target size of the optional RGB capture handed to a real model (downscaled, in-process only). */
+private const val RGB_CAPTURE = 256
+
+/**
+ * Compute left/center/right and average luminance from the Y plane. When [capturePixels] is true
+ * (only while a real model is loaded), also produce a small downscaled RGB buffer for inference.
+ * No pixels are stored or transmitted — the RGB buffer lives only for the lifetime of the frame.
+ */
+private fun ImageProxy.toFrameInput(capturePixels: Boolean): FrameInput {
     val plane = planes[0]
     val buffer = plane.buffer
     val rowStride = plane.rowStride
@@ -351,5 +362,38 @@ private fun ImageProxy.toFrameInput(): FrameInput {
     val total = leftN + midN + rightN
     val avg = if (total > 0) (leftSum + midSum + rightSum).toFloat() / total else 0f
 
-    return FrameInput(w, h, left, mid, right, avg)
+    val rgb = if (capturePixels) toRgbFloats(RGB_CAPTURE, RGB_CAPTURE) else null
+    return FrameInput(w, h, left, mid, right, avg, rgb, if (rgb != null) RGB_CAPTURE else 0, if (rgb != null) RGB_CAPTURE else 0)
+}
+
+/**
+ * Convert this YUV_420_888 frame to an interleaved RGB float buffer (0..1) downscaled to
+ * [outW]x[outH] via nearest-neighbor sampling, using the standard BT.601 YUV→RGB transform.
+ * Returns null on any plane/format surprise (caller falls back to no detections, never crashes).
+ */
+private fun ImageProxy.toRgbFloats(outW: Int, outH: Int): FloatArray? = try {
+    val yP = planes[0]; val uP = planes[1]; val vP = planes[2]
+    val yBuf = yP.buffer; val uBuf = uP.buffer; val vBuf = vP.buffer
+    val out = FloatArray(outW * outH * 3)
+    for (oy in 0 until outH) {
+        val sy = oy * height / outH
+        for (ox in 0 until outW) {
+            val sx = ox * width / outW
+            val yIdx = sy * yP.rowStride + sx * yP.pixelStride
+            val uvRow = (sy / 2) * uP.rowStride
+            val uvCol = (sx / 2) * uP.pixelStride
+            val y = if (yIdx < yBuf.capacity()) (yBuf.get(yIdx).toInt() and 0xFF) else 0
+            val u = if (uvRow + uvCol < uBuf.capacity()) (uBuf.get(uvRow + uvCol).toInt() and 0xFF) - 128 else 0
+            val v = if (uvRow + uvCol < vBuf.capacity()) (vBuf.get(uvRow + uvCol).toInt() and 0xFF) - 128 else 0
+            val r = (y + 1.402f * v).coerceIn(0f, 255f)
+            val g = (y - 0.344f * u - 0.714f * v).coerceIn(0f, 255f)
+            val b = (y + 1.772f * u).coerceIn(0f, 255f)
+            val o = (oy * outW + ox) * 3
+            out[o] = r / 255f; out[o + 1] = g / 255f; out[o + 2] = b / 255f
+        }
+    }
+    out
+} catch (e: Exception) {
+    Log.e("OBSERVA_CAMERA", "RGB capture failed", e)
+    null
 }
