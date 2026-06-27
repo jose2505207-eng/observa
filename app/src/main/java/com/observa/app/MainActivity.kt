@@ -38,6 +38,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
         controller = ObservaController(applicationContext)
+        controller.initVoice()
 
         setContent {
             OBSERVATheme {
@@ -65,18 +66,20 @@ private fun PermissionGate(content: @Composable () -> Unit) {
                 PackageManager.PERMISSION_GRANTED
         )
     }
+    // Camera is required (gates the app); microphone is optional (enables voice control).
+    val permissions = arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)
     val launcher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { result -> granted = result }
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { result -> granted = result[Manifest.permission.CAMERA] ?: granted }
 
     LaunchedEffect(Unit) {
-        if (!granted) launcher.launch(Manifest.permission.CAMERA)
+        if (!granted) launcher.launch(permissions)
     }
 
     if (granted) {
         content()
     } else {
-        PermissionFallback(onRequest = { launcher.launch(Manifest.permission.CAMERA) })
+        PermissionFallback(onRequest = { launcher.launch(permissions) })
     }
 }
 

@@ -78,8 +78,26 @@ fun ObservaScreen(controller: ObservaController) {
         CameraPanel(controller, modifier = Modifier.weight(1f).fillMaxWidth())
 
         AlertBanner(controller.lastAlert)
+        BrailleStatus(controller.brailleStatus)
         Dashboard(controller)
         Controls(controller)
+    }
+}
+
+/** Braille-friendly status as a polite TalkBack live region (drives a connected braille display). */
+@Composable
+private fun BrailleStatus(status: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Panel, RoundedCornerShape(12.dp))
+            .padding(12.dp)
+            .semantics {
+                liveRegion = LiveRegionMode.Polite
+                contentDescription = "Status: $status"
+            },
+    ) {
+        Text(text = status, color = Good, fontSize = 16.sp)
     }
 }
 
@@ -176,9 +194,20 @@ private fun Dashboard(controller: ObservaController) {
         StatRow("Backend", "${controller.backendName} (${controller.backendStatus})", OnDark)
         StatRow("Inference", controller.executorchStatus, OnDark)
         StatRow("Alert cooldown", controller.cooldownNote, OnDark)
+        StatRow("Observing", if (controller.observing) "On" else "Off", if (controller.observing) Good else Accent)
         StatRow("Demo Mode", if (controller.demoMode) "On" else "Off", if (controller.demoMode) Good else OnDark)
         StatRow("Speech", if (controller.ttsReady) (if (controller.muted) "Muted" else "Ready") else "Initializing", OnDark)
         StatRow("Haptics", if (controller.hapticsAvailable) "Available" else "Unavailable", OnDark)
+        StatRow(
+            "Voice",
+            when {
+                !controller.voiceAvailable -> "Unavailable"
+                controller.listening -> "Listening"
+                controller.voiceOnDevice -> "On-device ready"
+                else -> "Ready"
+            },
+            if (controller.voiceAvailable) OnDark else Accent,
+        )
         StatRow("Privacy", controller.privacyLabel, Good)
     }
 }
@@ -229,6 +258,32 @@ private fun Controls(controller: ObservaController) {
             Text(if (controller.muted) "Unmute" else "Mute", fontSize = 20.sp, fontWeight = FontWeight.Bold)
         }
     }
+    Spacer(Modifier.height(8.dp))
+    Button(
+        onClick = { controller.onMicPressed() },
+        enabled = controller.voiceAvailable,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(64.dp)
+            .semantics {
+                contentDescription =
+                    if (controller.voiceAvailable) "Voice command. Tap, then speak a command. ${controller.voiceState}"
+                    else "Voice command unavailable. Use the on-screen buttons."
+            },
+        colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Bg),
+    ) {
+        Text(
+            if (controller.listening) "Listening…" else "Voice Command",
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+        )
+    }
+    Text(
+        text = controller.voiceState,
+        color = OnDark,
+        fontSize = 14.sp,
+        modifier = Modifier.padding(top = 4.dp),
+    )
     Spacer(Modifier.height(4.dp))
 }
 

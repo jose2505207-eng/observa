@@ -16,6 +16,8 @@ class SpatialCueEngine(
     var hapticsEnabled: Boolean = true
     var audioEnabled: Boolean = true
 
+    val hapticsAvailable: Boolean get() = haptics.available
+
     fun cue(hazard: Hazard, nowMs: Long) {
         val key = "${hazard.type}:${hazard.direction}"
         if (!throttler.allow(key, nowMs)) return
