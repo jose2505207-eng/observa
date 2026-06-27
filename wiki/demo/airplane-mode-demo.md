@@ -21,7 +21,7 @@ Put the phone in **airplane mode**, then show continuous on-device awareness wor
 6. (Optional) [[conversational-vision]] answers a question about the scene.
 
 ## Current Reality
-What can be shown **today**: airplane mode on, app open, camera preview live, and the on-screen frame counter incrementing — proving an always-on, fully-offline analysis loop. No model output yet. Be honest about this on stage.
+What can be shown **today**, all in airplane mode (device-verified): camera preview live + frame/FPS counter (always-on offline loop); **Start Demo** scripted hazards spoken with directional audio + haptics + Braille/live-region status; **Read Text** offline OCR reading a sign aloud; **voice commands** (push-to-talk: "describe scene", "what is ahead", "read text", "braille status", etc.); Observing/Mute/Braille/Audio/Haptics toggles. Be honest on stage about two things: the live scene detector runs a **brightness heuristic** (no ML model bundled yet — the real ExecuTorch/YOLO path is implemented but the `.pte` isn't shipped), and **QNN is not active**. The dashboard states both truthfully.
 
 ## Related
 - [[judge-script]] · [[demo-checklist]] · [[failure-recovery]]

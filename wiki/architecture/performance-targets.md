@@ -29,4 +29,4 @@ All numbers above are **placeholders** pending real device measurement.
 - Tier separation so Tier 2 can't starve Tier 1 ([[two-tier-inference]]).
 
 ## Current Reality
-No performance work done. The loop counts frames; there is no inference to measure. Establish a measurement harness before optimizing — see [[profiling-plan]].
+No performance numbers yet: the analyzer runs at ~25–32 FPS, but with no `.pte` bundled there is no model inference to measure. Latency instrumentation is in place (`ExecuTorchDetector` load/last/avg ms → dashboard + logcat); populate these targets once a model is bundled — see [[profiling-plan]], [[executorch-qnn]].

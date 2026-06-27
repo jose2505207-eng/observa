@@ -4,6 +4,41 @@ Newest entries first. Append an entry whenever you make a meaningful change to t
 
 ---
 
+## 2026-06-28 — Wiki sync: model loading, OCR, cues, real detector (v1.3.0–v1.5.0)
+
+Brought the wiki in line with three shipped milestones (all device-verified on a
+Galaxy S25 Ultra, Android 16, in Airplane Mode; build + unit tests green; no
+`INTERNET` permission). Updated status pages: [[ambient-awareness]] → **current**,
+[[ocr-mode]] → **current**, [[voice-command-layer]] → **current**,
+[[privacy-model]] → **current**; [[executorch-qnn]] research→**planned** (integration
+code real, model not bundled); [[spatial-guidance]] stays **planned** (directional cue
+output shipped, aiming loop not).
+
+- **v1.3.0 — real ExecuTorch loading path + Braille/TalkBack readiness.**
+  `ExecuTorchDetector` really `Module.load`s a `.pte`, introspects `forward` backends,
+  runs off-thread; honest `UNAVAILABLE/FAILED/LOADED_CPU/LOADED_QNN`. `QnnRuntimeChecker`
+  fixed for `extractNativeLibs=false` (detects the delegate lib *in the APK*; never claims
+  active). App-level Braille channel: `BrailleStatusPresenter` + polite live region +
+  on/off toggle + voice "braille on/off/status"; direct `BrailleDisplayController` API
+  intentionally deferred (`docs/accessibility/braille-support.md`). On-screen Observing
+  toggle synced with voice; camera preview kept visible (scrollable layout + safe insets).
+- **v1.4.0 — unified output + offline OCR.** One `AccessibilityOutputRouter` fans every
+  event to TTS + Braille + audio cues + haptics + repeat store with
+  `HAZARD>NAVIGATION>OCR>MODE>INFO` priority (hazards interrupt; cues survive mute).
+  `SpatialCueEngine`/`AudioCuePlayer`/`HapticCuePlayer` (left/right/forward/urgent/confirm/
+  error) + audio/haptic settings. On-demand OCR via ML Kit **bundled** Latin model
+  (offline); `INTERNET`/`ACCESS_NETWORK_STATE` stripped via manifest merger.
+- **v1.5.0 — real detector path.** `YoloDetectionParser` (COCO→person/vehicle/obstacle,
+  threshold + class-aware NMS, left/center/right, hazard relevance, timestamp) +
+  `DetectedObject` + diagnostics (load ms, last/avg latency, in/out shapes, backends, QNN
+  active). Reproducible `scripts/export_detector.py` + `docs/real-detector.md`.
+
+**Tests:** 80 unit tests passing. **Still not done / blocked:** `observa_detector.pte`
+not bundled (no toolchain here + AGPL/version decisions) → on-device model load + real
+ML detection are blocked but reproducible; QNN never demonstrated active; OCR translation,
+conversational vision, navigation, and skills remain planned; physical Braille display +
+human sensory pass not yet performed.
+
 ## 2026-06-27 — Post-crash recovery + voice/cue/model integration
 
 Recovered uncommitted work from a laptop crash (4 untracked packages,

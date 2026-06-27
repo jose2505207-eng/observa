@@ -21,7 +21,7 @@ owner: jose2505207-eng
 - Emphasize Tier 1 keeps running even if Tier 2 stalls ([[two-tier-inference]]) — that's by design, not a bug.
 
 ## If someone questions the offline claim
-- Point to airplane mode being on and that there is no networking code in the core ([[offline-first-design]], [[privacy-model]]).
+- Point to airplane mode being on and that the app declares **no `INTERNET` permission** — it cannot reach the network even with ML Kit bundled (show `aapt2 dump permissions` / `dumpsys package`). See [[offline-first-design]], [[privacy-model]].
 
 ## Golden rule
 Never claim something works that just failed. Acknowledge it, show the fallback, return to the vision ([[judge-script]]).

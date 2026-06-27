@@ -21,7 +21,7 @@ owner: jose2505207-eng
 - Kotlin 2.2.10, AGP 9.2.1, Gradle Kotlin DSL.
 - `minSdk 26`, `targetSdk/compileSdk 36`, Java 11.
 - Dependencies in the version catalog `gradle/libs.versions.toml` (referenced as `libs.*`).
-- ExecuTorch linked from `app/libs/executorch.aar` (local AAR; not yet called — see [[executorch-qnn]]).
+- ExecuTorch linked from `app/libs/executorch.aar` (local AAR; the load/inference path is called for real, falls back honestly when no `.pte` is bundled — see [[executorch-qnn]]). ML Kit bundled OCR model also linked ([[ocr-mode]]).
 - R8 keep rules go in `app/src/main/keepRules/`.
 
 ## Running the app

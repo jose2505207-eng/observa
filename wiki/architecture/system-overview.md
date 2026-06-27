@@ -1,7 +1,7 @@
 ---
 status: planned
 confidence: medium
-last_updated: 2026-06-27
+last_updated: 2026-06-28
 owner: jose2505207-eng
 ---
 
@@ -14,13 +14,19 @@ A single-module Android app (`com.observa.app`) with one `MainActivity` and a Je
 
 ```
 Camera (CameraX)
-  → Preview  → on-screen PreviewView (Compose AndroidView)
-  → ImageAnalysis (background single-thread executor,
-       STRATEGY_KEEP_ONLY_LATEST, YUV_420_888)
-     → handleFrame(): counts frames, closes ImageProxy
+  → Preview → on-screen PreviewView (Compose AndroidView)
+  → ImageAnalysis (background executor, KEEP_ONLY_LATEST, YUV_420_888)
+     → FrameInput (L/C/R + avg luma; RGB tensor only when a model is loaded)
+       → ObservaController.runProcessingLoop():
+            ExecuTorchDetector (if model loaded) else HeuristicVisionRuntime
+          → HazardEngine (cooldown / scene memory)
+          → AccessibilityOutputRouter → TTS + Braille/live-region
+                                       + SpatialCueEngine (audio + haptics)
+On demand: "Read Text" → one-shot bitmap → MlKitOcrEngine (offline) → router
+Voice:     push-to-talk → OfflineSpeechRecognizer → VoiceCommandParser → CommandRouter
 ```
 
-That is the entire live pipeline. `handleFrame` is the seam where model input will be produced; it currently only increments a counter to prove the always-on loop is alive. ExecuTorch is bundled as a local AAR but **not called**. See [[executorch-qnn]].
+This whole pipeline is real and device-verified offline. `ExecuTorchDetector` actually calls the ExecuTorch API (`Module.load/forward`); with no `.pte` bundled it falls back honestly to the brightness heuristic. ML Kit's bundled OCR model and the platform on-device recognizer run locally; the app has **no `INTERNET` permission**. See [[executorch-qnn]], [[ocr-mode]], [[voice-command-layer]], [[privacy-model]].
 
 ## Future Vision
 The frame seam feeds a **two-tier inference** system:

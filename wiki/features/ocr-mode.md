@@ -1,7 +1,7 @@
 ---
-status: planned
-confidence: medium
-last_updated: 2026-06-27
+status: current
+confidence: high
+last_updated: 2026-06-28
 owner: jose2505207-eng
 ---
 
@@ -10,13 +10,16 @@ owner: jose2505207-eng
 > On-demand text reading — labels, signs, mail, documents — optionally translated. A Tier 2 capability ([[two-tier-inference]]).
 
 ## Current Reality
-Not implemented. No OCR, no text extraction.
+On-demand offline OCR works (read path), device-verified in Airplane Mode.
+- Engine: ML Kit **bundled** Latin text recognition (`com.google.mlkit:text-recognition`) — the model ships inside the APK and runs fully on device. `OcrEngine`/`MlKitOcrEngine` + pure `OcrFormatter`.
+- Trigger on demand only (never per-frame): the **Read Text** button, the voice command "read text", and the TalkBack-actionable button. A one-shot bitmap is captured from the analyzer (YUV→ARGB, rotated upright), recognized off the UI thread.
+- Result is spoken (TTS), shown in the Braille/live-region status, and stored for "repeat"; empty result says **"No readable text found."**
+- **No network:** `INTERNET` and `ACCESS_NETWORK_STATE` are stripped from the merged manifest, so ML Kit cannot use the network (verified `aapt2 dump permissions`). Translation is **not** implemented.
 
 ## Future Vision
-- User triggers OCR (voice/gesture); [[spatial-guidance]] helps aim if needed.
-- Run on-device text detection + recognition, read results aloud, prioritized and de-cluttered.
 - **Translation:** optionally translate recognized text on-device into the user's language (a core OBSERVA direction).
 - Document mode: handle multi-line/structured text (paragraphs, lists) for longer reading.
+- [[spatial-guidance]] to help aim at text before capture.
 
 ## Design notes
 - On-demand and heavier — fine to use a larger model since it runs briefly and must not block Tier 1.

@@ -1,7 +1,7 @@
 ---
-status: planned
-confidence: medium
-last_updated: 2026-06-27
+status: current
+confidence: high
+last_updated: 2026-06-28
 owner: jose2505207-eng
 ---
 
@@ -13,20 +13,23 @@ owner: jose2505207-eng
 - [x] Android Compose app scaffold ([[android-stack]]).
 - [x] CameraX preview + always-on `ImageAnalysis` loop with frame counter ([[ambient-awareness]]).
 - [x] Runtime camera permission flow + fallback.
-- [x] ExecuTorch AAR bundled (not yet called).
+- [x] ExecuTorch AAR bundled **and the load/inference path is called for real** (`Module.load/forward`); honest fallback when no model ([[executorch-qnn]]).
+- [x] Frame → tensor conversion (preprocessing) implemented.
+- [x] Spoken/Braille/audio/haptic awareness cues via the unified router ([[accessibility-principles]]).
+- [x] Whole Tier 1 path verified in **airplane mode** on S25 Ultra ([[airplane-mode-demo]]).
+- [x] On-demand [[ocr-mode]] reading text offline (ML Kit bundled).
+- [x] Offline [[voice-command-layer]].
 
-## MVP target (in priority order)
-1. [ ] Frame → tensor conversion at the `handleFrame` seam.
-2. [ ] Run a lightweight Tier 1 model via ExecuTorch on-device ([[executorch-qnn]], [[model-selection]]).
-3. [ ] Emit spoken/haptic awareness cues for a few salient classes ([[accessibility-principles]]).
-4. [ ] Verify the whole Tier 1 path works in **airplane mode** ([[airplane-mode-demo]]).
-5. [ ] (Stretch) On-demand [[ocr-mode]] reading one sign/label.
+## Remaining for a "real awareness cue from ML"
+1. [ ] Bundle a verified `observa_detector.pte` (`scripts/export_detector.py`) so the model path emits real detections ([[model-selection]]).
+2. [ ] Measure on-device latency; (stretch) lower to QNN and confirm active.
+3. [ ] Physical Braille-display + human sensory pass.
 
 ## Explicitly out of scope for MVP
-- Tier 2 VLM ([[conversational-vision]]), all skills ([[mcp-skill-system]]), navigation, full voice layer, translation beyond a stretch goal.
+- Tier 2 VLM ([[conversational-vision]]), all skills ([[mcp-skill-system]]), navigation, translation.
 
 ## Definition of success
-Airplane mode on → camera live → at least one real, useful spoken awareness cue, fully offline.
+Airplane mode on → camera live → at least one real, useful spoken awareness cue, fully offline. **Met today** via the heuristic + Demo + OCR + voice; the **ML-model** cue is pending the bundled `.pte`.
 
 ## Related
 - [[post-hackathon]] · [[demo-checklist]]

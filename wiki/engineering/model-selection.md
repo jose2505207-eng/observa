@@ -10,7 +10,9 @@ owner: jose2505207-eng
 > Which models run in each tier, and the tradeoffs. **All Research** — no model is integrated yet.
 
 ## Current Reality
-No model is loaded or run anywhere in the repo. ExecuTorch is bundled but unused ([[executorch-qnn]]).
+- **OCR:** ML Kit bundled Latin text-recognition model is integrated and runs offline on demand ([[ocr-mode]]).
+- **Detector:** the ExecuTorch path is wired and unit-tested for **YOLOv8n (COCO-80)** — preprocessing, `YoloDetectionParser`, NMS, class mapping. The `.pte` is **not bundled** (toolchain + AGPL/version decisions); reproducible export in `scripts/export_detector.py` / `docs/real-detector.md`. Until bundled, the app uses the brightness heuristic. See [[executorch-qnn]].
+- A permissive detector alternative (SSD-MobileNet / NanoDet) is noted for licensing.
 
 ## Selection criteria
 - On-device feasibility: size, latency, memory within [[performance-targets]].

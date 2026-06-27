@@ -32,7 +32,7 @@ Non-negotiable rules for a non-visual-first product. These constrain every featu
 - Coexist with TalkBack, cane, guide dog, and existing navigation apps — don't fight them.
 
 ## Current Reality
-The current UI sets `contentDescription` on the camera preview and permission screens, but there is no TTS, earcon, or haptic output yet. These principles are requirements for upcoming work.
+Largely realized in the output layer (device-verified): TTS speech (primary channel), stereo earcons, directional haptics, and a Braille/TalkBack polite live region — all via one unified router with hazard-priority interruption. High-contrast UI, `contentDescription`s, live regions, test tags, and an on-screen Observing/Braille/Audio/Haptics toggle set. Coexists with TalkBack. Still pending: physical Braille-display verification and a full human sensory pass.
 
 ## Related
 - [[safety-principles]] · [[ambient-awareness]] · [[spatial-guidance]]

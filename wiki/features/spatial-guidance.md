@@ -1,7 +1,7 @@
 ---
 status: planned
 confidence: medium
-last_updated: 2026-06-27
+last_updated: 2026-06-28
 owner: jose2505207-eng
 ---
 
@@ -10,13 +10,14 @@ owner: jose2505207-eng
 > Turns "something is there" into "face it / move toward it." This is how OBSERVA reverses the aim-the-camera assumption ([[vision]]).
 
 ## Current Reality
-Not implemented. No spatial reasoning, no directional output exists.
+The **directional cue output layer is implemented** (device-verified); the **active aiming/orientation loop is not** — hence this feature is still `planned`.
+- Coarse direction (LEFT / CENTER / RIGHT) is derived for every detection from the normalized box center (`DirectionMapper`) and carried on hazard alerts.
+- Cues are emitted through `SpatialCueEngine`: stereo-**panned** synthesized audio (`AudioCuePlayer`, in-memory, offline) + **directional haptics** (`HapticCuePlayer`: left/right/forward/urgent-stop/confirm/error). Speech says the direction ("on your left/right/ahead"); non-speech cues keep working when speech is muted (safety). Throttled via `CueThrottler`; toggles for audio cues and haptics.
+- **Not built:** the closed-loop "orient toward a target" correction ("a little right… there"), and any precise localization beyond left/center/right.
 
 ## Future Vision
-- After [[ambient-awareness]] flags a salient element, derive its rough direction/region in the frame.
-- Guide the user with directional cues: speech ("text to your left," "doorway ahead") plus spatialized earcons/haptics.
-- Help orient toward a target so a Tier 2 action ([[ocr-mode]], [[conversational-vision]]) can capture it well.
-- Provide simple, calm correction ("a little right... there") rather than rapid chatter.
+- Use detection position over time to guide the user to face/approach a target so a Tier 2 action ([[ocr-mode]], [[conversational-vision]]) can capture it well.
+- Provide simple, calm correction rather than rapid chatter.
 
 ## Design notes
 - Direction can start coarse (left / center / right / up / down) before any precise localization.

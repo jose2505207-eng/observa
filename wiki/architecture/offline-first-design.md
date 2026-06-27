@@ -20,7 +20,7 @@ owner: jose2505207-eng
 - No core code path may block on a network call.
 
 ## Current Reality
-The current app makes **no network calls at all** (no networking code, no internet usage in the core loop). The camera/analyzer loop runs locally. This satisfies offline-first by construction today — but only because inference doesn't exist yet. The guarantee must be preserved as models and features are added.
+Offline-first is now **enforced**, not just incidental: the app declares **no `INTERNET` permission** (and `ACCESS_NETWORK_STATE` is stripped), so it cannot make network calls even though it now bundles real inference — ML Kit's on-device OCR model, the on-device speech recognizer, and the ExecuTorch detector path all run locally. Verified by `aapt2 dump permissions` and on device in Airplane Mode. The guarantee must be preserved as features are added: any future online skill must be opt-in and isolated from the core ([[privacy-model]], [[ADR-0003-skill-system-boundaries]]).
 
 ## Demo implication
 The flagship demo runs in airplane mode. See [[airplane-mode-demo]].
