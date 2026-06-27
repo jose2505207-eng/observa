@@ -27,8 +27,9 @@ class VoiceCommandParser {
         word(text, "help", "commands")?.let { return it.to(CommandIntent.Help) }
         word(text, "repeat", "again", "say again")?.let { return it.to(CommandIntent.Repeat) }
         word(text, "cancel", "never mind", "nevermind")?.let { return it.to(CommandIntent.Cancel) }
-        word(text, "mute", "quiet", "silence")?.let { return it.to(CommandIntent.Mute) }
+        // "unmute" must be checked before "mute": "unmute" contains the substring "mute".
         word(text, "unmute", "speak")?.let { return it.to(CommandIntent.Unmute) }
+        word(text, "mute", "quiet", "silence")?.let { return it.to(CommandIntent.Mute) }
         word(text, "yes", "yeah", "correct", "confirm")?.let { return it.to(CommandIntent.Yes) }
         word(text, "no", "nope", "wrong")?.let { return it.to(CommandIntent.No) }
 
