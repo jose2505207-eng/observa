@@ -114,10 +114,11 @@ class ExecuTorchDetector(
                 continue
             }
             diagnostics.record(attempt(kind, com.observa.app.inference.BackendStage.ASSET_CHECK, true, modelPath = cand.path))
+            var checksum = "" // hoisted so the failure path can also record the .pte sha
             try {
                 val path = copyAssetToFiles(context, cand.path)
                 val bytes = File(path).length()
-                val checksum = sha256Of(path)
+                checksum = sha256Of(path)
                 val t0 = SystemClock.elapsedRealtime()
                 val m = Module.load(path)
                 val ms = SystemClock.elapsedRealtime() - t0
@@ -175,7 +176,7 @@ class ExecuTorchDetector(
                     qnnError = e.message ?: e.toString()
                     diagnostics.record(attempt(kind, com.observa.app.inference.BackendStage.WARMUP_FORWARD, false,
                         errorCode = hint, exceptionClass = e.javaClass.simpleName, message = e.message ?: e.toString(),
-                        nativeHint = hint, modelPath = cand.path))
+                        nativeHint = hint, modelPath = cand.path, modelChecksum = checksum))
                     diagnostics.record(attempt(kind, com.observa.app.inference.BackendStage.FALLBACK, true,
                         message = "falling back to next candidate"))
                     Log.e(TAG, "QNN candidate failed to load/warm-up → falling back to XNNPACK", e)

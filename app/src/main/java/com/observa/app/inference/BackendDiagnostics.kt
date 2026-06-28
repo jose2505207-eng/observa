@@ -55,6 +55,20 @@ class BackendDiagnostics {
         else "Backend: ${active?.label ?: BackendKind.XNNPACK_CPU.label}. ${fallbackReason()}"
     }
 
+    /**
+     * Whether a QNN model loaded (backends=[QnnBackend]) but the on-device backend init / warm-up
+     * forward failed — i.e. the failure is the device QNN/HTP path, not the model/export.
+     */
+    @Synchronized
+    fun qnnLoadedButDeviceInitFailed(): Boolean {
+        val loaded = attempts.any { it.backend == BackendKind.EXECUTORCH_QNN && it.stage == BackendStage.MODEL_LOAD && it.success }
+        val initFailed = attempts.any {
+            it.backend == BackendKind.EXECUTORCH_QNN && !it.success &&
+                (it.stage == BackendStage.WARMUP_FORWARD || it.stage == BackendStage.BACKEND_INIT)
+        }
+        return loaded && initFailed
+    }
+
     /** Full copy-paste debug report (judges / Qualcomm). */
     @Synchronized
     fun report(header: String): String = buildString {
@@ -64,6 +78,14 @@ class BackendDiagnostics {
         appendLine("Selected backend: ${(activeBackend() ?: BackendKind.XNNPACK_CPU).label}")
         appendLine("Fallback reason: ${fallbackReason()}")
         appendLine("Priority: ${BackendSelector.priorityDescription()}")
+        if (qnnLoadedButDeviceInitFailed()) {
+            appendLine("Native QnnDsp blocker: the QNN .pte LOADS (backends=[QnnBackend]); the on-device " +
+                "QNN/HTP backend init then fails during warm-up. ExecuTorch surfaces a generic 'error 0x1'; " +
+                "the real Qualcomm code is in the native log — capture it with:  adb logcat | grep -i QnnDsp")
+            appendLine("Expected on the retail S25 Ultra: 'Failed to load skel, error 4000' then " +
+                "'device_handle for Backend ID 6, error=14001' — the locked cDSP refuses the third-party " +
+                "unsigned protection domain. (In-app native-log read is blocked for untrusted_app.)")
+        }
         appendLine("-- attempts --")
         attempts.forEach { a ->
             appendLine("[${a.backend.name}/${a.stage.name}] success=${a.success}" +

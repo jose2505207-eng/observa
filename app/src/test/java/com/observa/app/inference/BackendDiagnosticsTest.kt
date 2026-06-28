@@ -57,4 +57,28 @@ class BackendDiagnosticsTest {
         assertTrue(r.contains("EXECUTORCH_QNN"))
         assertTrue(r.contains("Priority"))
     }
+
+    @Test
+    fun report_namesNativeBlocker_whenQnnLoadsButDeviceInitFails() {
+        val d = BackendDiagnostics()
+        // QNN .pte loads, then the on-device warm-up forward fails — the device-side QNN/HTP path.
+        d.record(BackendAttempt(BackendKind.EXECUTORCH_QNN, BackendStage.MODEL_LOAD, true, message = "backends=[QnnBackend]"))
+        d.record(BackendAttempt(BackendKind.EXECUTORCH_QNN, BackendStage.WARMUP_FORWARD, false))
+        d.record(BackendAttempt(BackendKind.XNNPACK_CPU, BackendStage.ACTIVE, true))
+        assertTrue(d.qnnLoadedButDeviceInitFailed())
+        val r = d.report("hdr")
+        // The copyable report must point judges/Qualcomm at the native QnnDsp error + the adb command.
+        assertTrue(r.contains("adb logcat | grep -i QnnDsp"))
+        assertTrue(r.contains("error 4000"))
+        assertTrue(r.contains("14001"))
+        assertFalse(d.npuActive())
+    }
+
+    @Test
+    fun report_noNativeBlocker_whenQnnNeverLoaded() {
+        val d = BackendDiagnostics()
+        d.record(BackendAttempt(BackendKind.EXECUTORCH_QNN, BackendStage.ASSET_CHECK, false, message = "not bundled"))
+        d.record(BackendAttempt(BackendKind.XNNPACK_CPU, BackendStage.ACTIVE, true))
+        assertFalse(d.qnnLoadedButDeviceInitFailed())
+    }
 }
