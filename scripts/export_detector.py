@@ -41,13 +41,15 @@ def main() -> int:
     ap.add_argument("--out", default="app/src/main/assets/models/observa_detector.pte")
     ap.add_argument("--weights", default="yolov8n.pt")
     ap.add_argument("--imgsz", type=int, default=640)
-    ap.add_argument("--qnn", action="store_true", help="lower to the Qualcomm QNN backend")
+    ap.add_argument("--qnn", action="store_true", help="lower to the Qualcomm QNN backend (NPU/HTP)")
+    ap.add_argument("--no-xnnpack", action="store_true",
+                    help="disable the XNNPACK CPU delegate (export slow portable kernels)")
     args = ap.parse_args()
 
     try:
         import torch
         from ultralytics import YOLO
-        from executorch.exir import to_edge
+        from executorch.exir import to_edge, to_edge_transform_and_lower
     except Exception as e:  # pragma: no cover - tooling guidance only
         print(f"[export] missing tooling: {e}\n"
               f"[export] install: pip install executorch ultralytics torch", file=sys.stderr)
@@ -60,30 +62,37 @@ def main() -> int:
     print("[export] tracing + exporting to ATen")
     exported = torch.export.export(model, example)
 
-    print("[export] lowering to ExecuTorch edge")
-    edge = to_edge(exported)
-
+    backend_tag = "cpu-portable"
     if args.qnn:
         # Requires the ExecuTorch QNN backend + Qualcomm SDK; see docs/real-detector.md.
-        try:
-            from executorch.backends.qualcomm.partition.qnn_partitioner import QnnPartitioner
-            from executorch.backends.qualcomm.utils.utils import generate_qnn_executorch_compiler_spec
-            edge = edge.to_backend(QnnPartitioner(generate_qnn_executorch_compiler_spec()))
-            print("[export] QNN partitioning applied")
-        except Exception as e:
-            print(f"[export] QNN lowering unavailable ({e}); exporting CPU .pte", file=sys.stderr)
+        from executorch.backends.qualcomm.partition.qnn_partitioner import QnnPartitioner
+        from executorch.backends.qualcomm.utils.utils import generate_qnn_executorch_compiler_spec
+        edge = to_edge(exported).to_backend(
+            QnnPartitioner(generate_qnn_executorch_compiler_spec()))
+        backend_tag = "qnn"
+        print("[export] QNN partitioning applied")
+    elif not args.no_xnnpack:
+        # XNNPACK is the standard optimized CPU delegate; ~10-40x faster than portable reference
+        # kernels on ARM. Bundled in the executorch.aar libexecutorch.so. No Qualcomm SDK needed.
+        from executorch.backends.xnnpack.partition.xnnpack_partitioner import XnnpackPartitioner
+        print("[export] lowering to ExecuTorch edge + XNNPACK delegate")
+        edge = to_edge_transform_and_lower(exported, partitioner=[XnnpackPartitioner()])
+        backend_tag = "xnnpack"
+    else:
+        print("[export] lowering to ExecuTorch edge (portable CPU kernels)")
+        edge = to_edge(exported)
 
     prog = edge.to_executorch()
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     with open(args.out, "wb") as f:
         f.write(prog.buffer)
     size = os.path.getsize(args.out)
-    print(f"[export] wrote {args.out} ({size} bytes)")
+    print(f"[export] wrote {args.out} ({size} bytes) backend={backend_tag}")
     # Write the version sidecar OBSERVA reads for diagnostics.
     with open(args.out + ".version", "w") as f:
         import executorch
         f.write(f"yolov8n-coco imgsz={args.imgsz} executorch={getattr(executorch,'__version__','?')}"
-                f"{' qnn' if args.qnn else ' cpu'}\n")
+                f" {backend_tag}\n")
     print("[export] done. Verify on device; check OBSERVA_MODEL logcat for output shapes.")
     return 0
 

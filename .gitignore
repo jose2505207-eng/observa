@@ -25,3 +25,6 @@ captures/
 
 # IDE
 .idea/
+
+# Model source weights (re-downloaded by scripts/export_detector.py)
+yolov8n.pt

@@ -456,8 +456,11 @@ private fun NavPanel(controller: ObservaController) {
     }
 }
 
-/** Target size of the optional RGB capture handed to a real model (downscaled, in-process only). */
-private const val RGB_CAPTURE = 256
+/**
+ * Target size of the optional RGB capture handed to a real model (downscaled, in-process only).
+ * Matches the bundled YOLOv8n detector's 320×320 input so no second resize/upscale is needed.
+ */
+private const val RGB_CAPTURE = 320
 
 /**
  * Compute left/center/right and average luminance from the Y plane. When [capturePixels] is true

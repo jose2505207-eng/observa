@@ -1,0 +1,1 @@
+yolov8n-coco imgsz=320 executorch=? xnnpack

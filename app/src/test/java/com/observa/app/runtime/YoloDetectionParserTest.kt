@@ -74,6 +74,18 @@ class YoloDetectionParserTest {
         assertEquals(0.9f, out[0].confidence, 0.001f)
     }
 
+    @Test fun selectsDetectionTensorAmongMultipleOutputs() {
+        // The real exported YOLOv8n head emits several tensors; the [1,84,8400] detection tensor
+        // is not always first. The parser must pick it by shape, ignoring [1,64,N]/[1,80,N]/maps.
+        val det = tensor(listOf(box(160f, 320f, 128f, 256f, cls = 0, prob = 0.9f)))
+        val noise64 = TensorOutput(longArrayOf(1, 64, 1), FloatArray(64))
+        val noise80 = TensorOutput(longArrayOf(1, 80, 1), FloatArray(80))
+        val map4d = TensorOutput(longArrayOf(1, 64, 80, 80), FloatArray(64 * 80 * 80))
+        val out = parser().parse(listOf(noise64, noise80, map4d, det), nowMs = 7L)
+        assertEquals(1, out.size)
+        assertEquals("PERSON", out[0].label)
+    }
+
     @Test fun unexpectedShapeYieldsEmptyNotCrash() {
         val weird = TensorOutput(longArrayOf(1, 10, 10), FloatArray(100))
         assertTrue(parser().parse(listOf(weird), 0L).isEmpty())

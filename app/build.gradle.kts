@@ -49,6 +49,11 @@ dependencies {
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
     implementation(files("libs/executorch.aar"))
+    // ExecuTorch's Java Module loads its native libs via Facebook SoLoader/fbjni; the AAR is a bare
+    // file dependency so these transitive runtime deps must be declared explicitly (versions pinned
+    // to match executorch/extension/android/executorch_android/build.gradle).
+    implementation("com.facebook.fbjni:fbjni:0.7.0")
+    implementation("com.facebook.soloader:nativeloader:0.10.5")
     implementation(libs.mlkit.text.recognition)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)

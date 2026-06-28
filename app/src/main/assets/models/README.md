@@ -60,5 +60,15 @@ lowered to Qualcomm QNN — e.g. from the ExecuTorch examples
 - license,
 - file size.
 
-No model is committed yet, so the app runs the heuristic fallback and claims no ML
-detection or QNN acceleration.
+## Bundled model (committed)
+
+`observa_detector.pte` is committed: **YOLOv8n COCO-80, exported at 320×320 with the XNNPACK
+CPU delegate** (executorch 1.4.0a0 toolchain, matching `app/libs/executorch.aar`).
+
+- input: `float32 [1,3,320,320]` RGB 0..1 NCHW · output: `[1,84,2100]` (+ aux head tensors)
+- size ~12.7 MB · sidecar `observa_detector.pte.version` = `yolov8n-coco imgsz=320 … xnnpack`
+- **Verified on Galaxy S25 Ultra (SM8750):** `forward backends=[XnnpackBackend]`, inference
+  **median ~32 ms** (range 26–43 ms), in Airplane Mode. See `docs/implementation/MODEL_RUNTIME.md`.
+
+Reproduce: `python scripts/export_detector.py --imgsz 320` (XNNPACK is the default delegate).
+QNN/NPU build: `--qnn` (requires the Qualcomm QNN SDK + HTP runtime libs in the APK).

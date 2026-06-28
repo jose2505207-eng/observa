@@ -64,15 +64,23 @@ class YoloDetectionParser(
     override val name = "yolo"
 
     override fun parse(outputs: List<TensorOutput>, nowMs: Long): List<DetectedObject> {
-        val t = outputs.firstOrNull() ?: return emptyList()
+        val withObj = numClasses + 5
+        val noObj = numClasses + 4
+
+        // A YOLOv8 head exported raw can emit several tensors (e.g. [1,84,8400], [1,64,8400],
+        // [1,80,8400] + feature maps). Pick the one detection tensor whose attribute axis is
+        // exactly 4/5 + numClasses, regardless of output ordering — never just the first.
+        val t = outputs.firstOrNull { o ->
+            val sh = o.shape
+            sh.size == 3 && sh[0] == 1L &&
+                (sh[1].toInt() == withObj || sh[1].toInt() == noObj ||
+                    sh[2].toInt() == withObj || sh[2].toInt() == noObj)
+        } ?: return emptyList()
         val s = t.shape
-        if (s.size != 3 || s[0] != 1L) return emptyList()
         val a = s[1].toInt()
         val b = s[2].toInt()
 
         // Resolve which axis is "attributes per box" (4/5 + classes) vs "number of boxes".
-        val withObj = numClasses + 5
-        val noObj = numClasses + 4
         val (attrs, numBoxes, channelsFirst) = when {
             a == withObj || a == noObj -> Triple(a, b, true)   // [1, C, N]
             b == withObj || b == noObj -> Triple(b, a, false)  // [1, N, C]

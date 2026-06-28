@@ -26,9 +26,12 @@ import java.io.File
  */
 class ExecuTorchDetector(
     private val modelAssetPath: String = "models/observa_detector.pte",
-    private val parser: DetectionParser = YoloDetectionParser(),
-    private val inputWidth: Int = 640,
-    private val inputHeight: Int = 640,
+    private val inputWidth: Int = 320,
+    private val inputHeight: Int = 320,
+    // Parser's inputSize MUST match the exported model's input resolution (box coords are in
+    // input-pixel units). The bundled detector is YOLOv8n exported at 320×320 with the XNNPACK
+    // CPU delegate (see scripts/export_detector.py / assets/models/README.md).
+    private val parser: DetectionParser = YoloDetectionParser(inputSize = inputWidth),
 ) : InferenceEngine {
 
     @Volatile
