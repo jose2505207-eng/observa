@@ -4,6 +4,27 @@ Newest entries first. Append an entry whenever you make a meaningful change to t
 
 ---
 
+## 2026-06-29 — 🎉 QNN/NPU detector ACTIVE on the S25 Ultra (blocker fixed)
+
+The NPU now runs the detector. Branch `fix-npu-runtime`.
+
+- **Fix:** one manifest line — `<uses-native-library android:name="libcdsprpc.so" android:required="false"/>`
+  in `app/src/main/AndroidManifest.xml`. On Android 12+ the app could not `dlopen` the vendor cDSP
+  FastRPC client (`libcdsprpc.so`), so QNN HTP failed to create the FastRPC transport → `error 4000` →
+  `Failed to load skel`. Declaring it lets the app's linker namespace reach the vendor library; the v79
+  skel then loads on the cDSP (domain 3) and HTP init succeeds. Credit: psiddh/executorch pr-20057.
+- **Correction (honesty):** my earlier "retail device hard-blocks HTP via signing/protection-domain"
+  conclusion (Outcome B) was **wrong about the cause**. The symptom (`skel 4000`, model-independent,
+  cross-stack) was right; the cause was the missing native-library declaration, not signing.
+- **Device-verified:** `OBSERVA_NPU stage=WARMUP_FORWARD success=true` → `stage=ACTIVE backends=[QnnBackend]`;
+  `Successfully opened libQnnHtpV79Skel.so` + `remote_handle64_open … qnn_skel_handle_invoke … domain 3`;
+  `OBSERVA_EXECUTORCH … forward backends=[QnnBackend]; parser=yolo-raw-head; QNN/NPU ACTIVE`;
+  `OBSERVA_MODEL inference 2ms (avg 2ms)`. ~10–15× faster than XNNPACK CPU. Stable, no fallback, no crash.
+- XNNPACK CPU kept as automatic fallback (`required=false`). demoOffline still no INTERNET. 177 tests
+  green. Docs corrected (MODEL_RUNTIME, executorch-qnn, NPU_DEBUG_REPORT, README, release notes).
+
+---
+
 ## 2026-06-29 — NPU Debug menu + structured backend diagnostics (release-blocker probe)
 
 Investigated the "running on GPU/CPU not NPU" release blocker. Branch `fix-npu-runtime`.

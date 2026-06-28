@@ -7,6 +7,17 @@ owner: jose2505207-eng
 
 # ExecuTorch & Qualcomm QNN
 
+> **✅ 2026-06-29 — QNN/NPU IS NOW ACTIVE ON DEVICE.** The detector runs on the Hexagon NPU of the
+> retail Galaxy S25 Ultra (SM8750, HTP v79) at **~2–3 ms** (`forward backends=[QnnBackend]`,
+> `parser=yolo-raw-head`, warm-up forward succeeds → `QNN/NPU ACTIVE`). The earlier "retail device
+> blocks HTP" conclusion below was **wrong about the cause**: it was not a signing / protection-domain
+> block, it was the **Android 12+ vendor-native-library access rule** — the app could not `dlopen`
+> `libcdsprpc.so` (the cDSP FastRPC client), so transport creation failed with `error 4000`. **Fix = one
+> manifest line:** `<uses-native-library android:name="libcdsprpc.so" android:required="false"/>`
+> (credit: github.com/psiddh/executorch pr-20057). The v79 skel now loads on the cDSP (domain 3); XNNPACK
+> CPU remains the automatic fallback for devices without the library. The investigation notes below are
+> kept for honesty — they nailed the symptom but mis-attributed the cause.
+
 > **2026-06-29 re-audit (fresh, after a laptop crash-during-build scare):** the whole host/export
 > pipeline was rebuilt and re-run from scratch and the on-device test repeated. **Result: not a
 > laptop-build artifact.** Host pybind rebuilt clean (`make PyQnnManagerAdaptor` → `[100%] Built

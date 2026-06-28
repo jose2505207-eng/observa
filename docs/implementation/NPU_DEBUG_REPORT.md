@@ -3,11 +3,45 @@
 Single source of truth for the NPU release-blocker investigation. Companion to the deep
 reverse-engineering matrix in [`QNN_REVERSE_ENGINEERING_LOG.md`](QNN_REVERSE_ENGINEERING_LOG.md).
 
-**Bottom line:** the detector does **not** run on the NPU on the retail Galaxy S25 Ultra. It is **not**
-falling back to GPU — there is **no GPU/Vulkan path in the app at all**; the only fallback is **XNNPACK
-CPU**, clearly labeled. The QNN/NPU path is fully built and the `.pte` loads, but HTP device-handle
-creation is refused by the locked retail DSP (`skel 4000` / `device_handle 14001`). This is proven
-model-independent and reproduced across two QNN stacks. NPU needs a signed/privileged build.
+## ✅ RESOLVED 2026-06-29 — the detector now runs on the NPU
+
+**The NPU works on the retail Galaxy S25 Ultra.** The blocker was **not** a signing / protection-domain
+restriction (my earlier conclusion was wrong) — it was the **Android 12+ vendor-native-library access
+rule**: the app could not `dlopen` the vendor `libcdsprpc.so` FastRPC client, so QNN HTP failed to
+create the cDSP transport (`Failed to create transport for device, error: 4000` → `Failed to load skel,
+error: 4000`). **The fix is one manifest line:**
+
+```xml
+<uses-native-library android:name="libcdsprpc.so" android:required="false" />
+```
+
+(Credit: github.com/psiddh/executorch pr-20057 `examples/qualcomm/qnn-htp-test`.)
+
+**Device-verified after the fix** (fresh logcat, demoOffline build, no INTERNET):
+```
+OBSERVA_NPU attempt=EXECUTORCH_QNN stage=WARMUP_FORWARD success=true
+OBSERVA_NPU attempt=EXECUTORCH_QNN stage=ACTIVE         success=true detail=backends=[QnnBackend]
+adsprpc: Successfully opened .../lib/arm64/libQnnHtpV79Skel.so
+adsprpc: remote_handle64_open ... libQnnHtpV79Skel.so?qnn_skel_handle_invoke ... on domain 3 (cDSP)
+OBSERVA_EXECUTORCH: ... forward backends=[QnnBackend]; parser=yolo-raw-head; QNN/NPU ACTIVE.
+OBSERVA_MODEL: inference 2ms (avg 2ms); outputs=[[1,144,40,40],[1,144,20,20],[1,144,10,10]] parser=yolo-raw-head
+```
+The v79 skel loads on the cDSP, the warm-up forward succeeds, and the YOLOv8n detector runs on the NPU
+at **~2–3 ms** (vs ~22–32 ms on XNNPACK CPU — ~10–15×). `npuActive()` is true (set only after the real
+warm-up). No INTERNET. XNNPACK CPU is retained as the automatic fallback on devices that lack the
+library (`required="false"`).
+
+> The investigation history below is preserved for honesty. It correctly captured the *symptom*
+> (`skel 4000`) and proved it was model-independent and cross-stack, but it mis-attributed the *cause*
+> to a protection-domain/signing block. The real cause was the missing `libcdsprpc.so` declaration.
+
+---
+
+## (Superseded) earlier bottom line
+
+The detector does not run on the NPU; the QNN `.pte` loads, but HTP device-handle creation fails
+(`skel 4000` / `device_handle 14001`). — **Now resolved; see above.** It was never a GPU fallback —
+there is no GPU path; the only fallback is XNNPACK CPU.
 
 ## What this session added (in-app diagnostics)
 

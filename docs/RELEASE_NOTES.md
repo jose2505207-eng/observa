@@ -4,6 +4,24 @@ Offline-first, privacy-first AI vision assistant for blind and low-vision users.
 `main` shippable: each builds, passes unit tests, has **no `INTERNET` permission**, and launches in
 airplane mode with camera preview intact.
 
+## Unreleased — 🎉 QNN/NPU detector ACTIVE on device (the release blocker is fixed)
+
+- **The detector now runs on the Hexagon NPU** of the retail Galaxy S25 Ultra (SM8750, HTP v79):
+  `forward backends=[QnnBackend]`, warm-up forward succeeds, `OBSERVA_NPU … stage=ACTIVE success=true`,
+  **~2–3 ms/inference** (vs ~22–32 ms XNNPACK CPU — ~10–15×). Device-verified, demoOffline build, no
+  INTERNET. `LOADED_QNN`/`npuActive` set only after the real warm-up forward.
+- **Root cause + fix:** the prior `skel 4000` / `device_handle 14001` was **not** a signing /
+  protection-domain block (earlier conclusion corrected). It was the **Android 12+ vendor-native-library
+  access rule** — the app could not `dlopen` the vendor `libcdsprpc.so` FastRPC client, so QNN HTP could
+  not create the cDSP transport. **Fix = one manifest line:**
+  `<uses-native-library android:name="libcdsprpc.so" android:required="false"/>`. With it, the v79 skel
+  loads on the cDSP (domain 3) and HTP init succeeds. Credit: github.com/psiddh/executorch pr-20057
+  (`examples/qualcomm/qnn-htp-test`).
+- **XNNPACK CPU is retained as the automatic fallback** (`required="false"`) for devices without the
+  library. Detector parser switches to `yolo-raw-head` on the QNN path (decode on CPU), identical
+  detections. Docs corrected: MODEL_RUNTIME, executorch-qnn (wiki), NPU_DEBUG_REPORT, README. 177 tests
+  green. **This is genuinely NPU-active and may be tagged as such.**
+
 ## Unreleased — NPU Debug menu + structured backend diagnostics (release-blocker investigation)
 
 - **The app was NOT falling back to GPU.** There is **no GPU/Vulkan/LiteRT path compiled in** — the

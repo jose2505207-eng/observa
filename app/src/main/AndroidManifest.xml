@@ -34,6 +34,18 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.OBSERVA">
+
+        <!-- THE fix that enables QNN/NPU on Android 12+: declare the vendor cDSP FastRPC client so the
+             app's linker namespace can dlopen libcdsprpc.so. Without this, QNN HTP fails to create the
+             FastRPC transport to the Hexagon cDSP ("Failed to create transport for device, error: 4000"
+             → "Failed to load skel, error: 4000") and falls back to XNNPACK CPU. With it, the v79 skel
+             loads on the cDSP and the detector runs on the NPU (~2 ms vs ~30 ms CPU). required=false so
+             the app still installs on devices without the library (it falls back to XNNPACK CPU).
+             Ref: github.com/psiddh/executorch pr-20057 examples/qualcomm/qnn-htp-test. -->
+        <uses-native-library
+            android:name="libcdsprpc.so"
+            android:required="false" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

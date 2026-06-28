@@ -1,7 +1,16 @@
 # MODEL RUNTIME — real on-device inference (Agent 1)
 
-**Status: REAL local ML inference verified on device.** OBSERVA runs a YOLOv8n object detector
-through ExecuTorch, fully offline, on the Samsung Galaxy S25 Ultra (Snapdragon 8 Elite, SM8750).
+**Status: REAL local ML inference verified on device — NOW ON THE NPU.** OBSERVA runs a YOLOv8n object
+detector through ExecuTorch, fully offline, on the Samsung Galaxy S25 Ultra (Snapdragon 8 Elite, SM8750).
+
+> **✅ 2026-06-29 — QNN/NPU ACTIVE.** The detector runs on the **Hexagon NPU (HTP v79)** at **~2–3 ms**
+> (`forward backends=[QnnBackend]`, `QNN/NPU ACTIVE`), ~10–15× faster than the XNNPACK CPU path (~30 ms).
+> The enabler was a single manifest declaration —
+> `<uses-native-library android:name="libcdsprpc.so" android:required="false"/>` — which grants the
+> app access to the vendor cDSP FastRPC client on Android 12+. The earlier "device DSP skel-load
+> block" sections below correctly captured the `skel 4000` symptom but **mis-attributed the cause** to a
+> signing/protection-domain restriction; the real cause was this missing native-library declaration.
+> XNNPACK CPU remains the automatic fallback (`required="false"`). Credit: psiddh/executorch pr-20057.
 
 ## What runs
 
