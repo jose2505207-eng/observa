@@ -26,11 +26,13 @@ app says so. Do not claim NPU active.
    `Detector backend: XNNPACK CPU fallback. QNN attempted: <skel 4000> ...`.
 
 ## If asked about the NPU
-"We built the full QNN/NPU pipeline: the YOLOv8n raw head lowers to Qualcomm HTP and we ship a real
-QnnBackend .pte plus the v79 runtime libs. On a retail S25 Ultra the Hexagon DSP refuses to load an
-unsigned HTP skel from app storage (`error 4000`) — that needs a signed PD or an engineering build, so
-we fall back to XNNPACK CPU and report it truthfully. It already beats the 100 ms danger target at
-~32 ms, so there's no functional gap in the demo."
+"We built the full QNN/NPU pipeline — the YOLOv8n raw head lowers to Qualcomm HTP, we ship a real
+QnnBackend .pte and the v79 runtime. On this *retail* S25 Ultra the Hexagon DSP refuses to load an
+unsigned HTP skel from a third-party app (`error 4000`). We proved it's an OS-level lock, not our bug,
+two ways: ExecuTorch QNN and Google's official LiteRT Qualcomm delegate fail *identically*, while the
+phone's own camera loads DSP skels at the same moment. Running our model on the NPU would need a
+signed/privileged build or an engineering device. So we run real on-device inference on XNNPACK CPU at
+~32 ms — under the 100 ms danger target — and the app reports the backend honestly."
 
 ## Hard rules
 - [ ] Never say "NPU active" — the status node is the source of truth.

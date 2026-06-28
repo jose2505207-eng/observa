@@ -4,6 +4,23 @@ Newest entries first. Append an entry whenever you make a meaningful change to t
 
 ---
 
+## 2026-06-28 — NPU rescue: confirmed OS-level retail block via a second stack (LiteRT QNN)
+
+Attempted to make NPU real on the retail S25 Ultra. Found the device ships **signed vendor QNN 2.27.5**
+HTP v79 skels (e.g. `/vendor/lib64/rfs/dsp/snap/libQnnHtpV79Skel.so`) but they are reserved for signed
+system PDs. Pointing ExecuTorch QNN at the vendor signed skel still gave `skel 4000`. Then wired the
+**official Qualcomm LiteRT QNN delegate** (`com.qualcomm.qti:qnn-litert-delegate:2.28.0` +
+`qnn-runtime:2.28.0`, no INTERNET) with a TFLite probe model and `HTP_BACKEND` / unsigned PD — it
+failed with the **identical** `Failed to load skel, error 4000` / `device_handle 14001`, while the
+camera HAL loaded cDSP skels in the same logcat. Conclusion: **the retail unit (user build,
+verified-boot green) blocks third-party apps from loading HTP skels on the cDSP** — NPU is unreachable
+by any sideloaded stack (ExecuTorch QNN and Qualcomm LiteRT both blocked). The LiteRT experiment was
+reverted (≈40 MB, non-functional); evidence captured in `MODEL_RUNTIME.md` / `executorch-qnn.md`.
+**v2.2.0 still NOT tagged** — NPU is not active and we do not claim it. XNNPACK CPU detector +
+accessibility unchanged; build/tests green; no INTERNET.
+
+---
+
 ## 2026-06-28 — v2.2.0 QNN/NPU detector pipeline (export→load works; device DSP blocks HTP)
 
 Real QNN/NPU path built end-to-end and validated on the connected S25 Ultra (`R3CXC08009D`). Build +

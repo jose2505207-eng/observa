@@ -14,10 +14,14 @@ airplane mode with camera preview intact.
   tests) — detections identical to the XNNPACK path.
 - **Packaged** the v79 device libs in `jniLibs/arm64-v8a` + `model_manifest.json`. `ExecuTorchDetector`
   tries QNN first and accepts it **only** after a successful warm-up `forward`, else XNNPACK.
-- **Blocker on this device:** the `.pte` loads but the production S25 Ultra cDSP rejects the unsigned
-  HTP skel (`QnnDsp Failed to load skel, error 4000`), even with `ADSP_LIBRARY_PATH` set. Needs a
-  signed PD / engineering build / root. **NPU is not claimed active**; detector runs XNNPACK CPU
-  (~32 ms) and the status reads `XNNPACK CPU fallback. QNN attempted: <skel 4000>`. No `INTERNET`.
+- **Blocker on this device (OS-level, confirmed two ways):** the `.pte` loads but the production
+  S25 Ultra cDSP rejects the unsigned HTP skel (`QnnDsp Failed to load skel, error 4000`), even with
+  `ADSP_LIBRARY_PATH` set. Independently, the official **Qualcomm LiteRT QNN delegate** (`qnn-litert-
+  delegate:2.28.0`, matched to the device's 2.27.5 firmware) fails **identically**, while signed
+  system processes load cDSP skels in the same logcat. So a third-party app cannot use the NPU on this
+  retail unit (needs signed PD / engineering build / root). **NPU is not claimed active**; detector
+  runs XNNPACK CPU (~32 ms), status reads `XNNPACK CPU fallback. QNN attempted: <skel 4000>`. No
+  `INTERNET`. (The LiteRT delegate was trialled then reverted — 40 MB, non-functional here.)
 
 ### Native TalkBack + braille operating layer
 - **Operable without visual buttons.** New native operating layer: stable **Current status**, **Last

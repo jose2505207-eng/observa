@@ -145,6 +145,28 @@ PD, root to stage the skel in `/vendor`, or a Qualcomm-signed skel/PD. The full 
 package → load → honest backend selection) is in place and would light up automatically on such a
 device, because `LOADED_QNN` is set only when a QNN warm-up `forward` truly succeeds.
 
+### Cross-checked with a second, independent stack (Google LiteRT + Qualcomm QNN delegate)
+To rule out an ExecuTorch-specific issue, the **official Qualcomm AI Engine Direct LiteRT delegate**
+(`com.qualcomm.qti:qnn-litert-delegate:2.28.0` + `qnn-runtime:2.28.0`, the version closest to the
+device's own vendor QNN firmware `2.27.5`) was wired into a TFLite `Interpreter` with
+`QnnDelegate.Options(BackendType.HTP_BACKEND, HtpPdSession.HTP_PD_SESSION_UNSIGNED)` and a tiny probe
+model. These AARs ship Qualcomm's own matched HTP host libs + v79 skel and declare **no INTERNET**.
+Result on the same retail device — **identical failure**:
+
+```
+[Qnn ExecuTorch] Failed to load skel, error: 4000
+Failed to create device_handle for Backend ID 6, error=14001
+OBSERVA_NPU: QNN HTP delegate NOT available: Failed to apply delegate
+```
+
+Decisive detail: in the **same** logcat, signed system processes (the camera HAL) load cDSP skels
+fine (`libbitml_nsp_79na_skel.so`, `libois_channel_skel.so`). So the cDSP works — it just refuses
+HTP skel loads from a **third-party app's protection domain**. This is an **OS-level retail security
+restriction** (user build, verified-boot green), not a bug in our export/packaging: **two independent
+QNN stacks fail identically**, so on this handset the NPU is unreachable by any sideloaded app
+(Priorities 1–4 all blocked). The LiteRT experiment was reverted (it adds ~40 MB and does not work);
+the reproducible evidence lives here. NPU would require a signed/privileged build or an OEM allowlist.
+
 ## Reproduce the artifact
 
 ```bash

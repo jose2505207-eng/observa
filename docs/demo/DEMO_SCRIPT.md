@@ -36,7 +36,9 @@ Enable **Airplane Mode**. Grant camera + mic.
 ## Beat 4 — "We chased the NPU honestly" (40s)
 - Open debug status: *"Detector backend: XNNPACK CPU fallback. QNN attempted: skel load 4000."*
 - Line: *"The full Qualcomm QNN/NPU pipeline is in the app — a real HTP-lowered model plus the v79
-  runtime. The retail DSP blocks unsigned skels, so we fall back to CPU and tell the truth. No fake
+  runtime. We proved the retail DSP blocks third-party NPU access two independent ways (ExecuTorch QNN
+  and Google's official LiteRT Qualcomm delegate both fail identically, while the camera uses the DSP
+  fine). It needs a signed/engineering build. So we fall back to CPU and tell the truth — no fake
   acceleration."*
 
 ## Close
