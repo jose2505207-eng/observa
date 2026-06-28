@@ -154,6 +154,10 @@ private fun OperatingLayer(controller: ObservaController) {
         CustomAccessibilityAction("Start OCR, read text") { controller.readText(); true },
         CustomAccessibilityAction("Start scene question") { controller.sceneQuestion(); true },
         CustomAccessibilityAction("Start translation mode") { controller.startTranslation(); true },
+        CustomAccessibilityAction(
+            if (controller.orientationActive) "Repeat orientation" else "Start orientation",
+        ) { if (controller.orientationActive) controller.repeatOrientation() else controller.startOrientation(); true },
+        CustomAccessibilityAction("Stop orientation") { controller.stopOrientation(); true },
         CustomAccessibilityAction("Silence alerts") { controller.silenceAlerts(); true },
         CustomAccessibilityAction("Open debug status") { controller.announceDebugStatus(); true },
     )

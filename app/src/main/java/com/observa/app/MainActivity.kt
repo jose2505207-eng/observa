@@ -106,8 +106,14 @@ private fun PermissionGate(content: @Composable () -> Unit) {
                 PackageManager.PERMISSION_GRANTED
         )
     }
-    // Camera is required (gates the app); microphone is optional (enables voice control).
-    val permissions = arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)
+    // Camera is required (gates the app); microphone (voice) and location (GPS orientation) are
+    // optional enhancements — the app runs without them.
+    val permissions = arrayOf(
+        Manifest.permission.CAMERA,
+        Manifest.permission.RECORD_AUDIO,
+        Manifest.permission.ACCESS_FINE_LOCATION,
+        Manifest.permission.ACCESS_COARSE_LOCATION,
+    )
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { result -> granted = result[Manifest.permission.CAMERA] ?: granted }

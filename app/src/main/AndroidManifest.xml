@@ -11,6 +11,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <!-- GPS Orientation Lite: device location for heading/bearing/distance guidance. GPS is
+         satellite-based and works offline; this is NOT network/INTERNET access. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <!--
       OBSERVA is offline by design. ML Kit (bundled on-device OCR model) and some

@@ -20,6 +20,8 @@ data class A11yState(
     val navigating: Boolean,
     /** Raw last hazard line (already short), or null/blank if nothing meaningful yet. */
     val lastAlert: String?,
+    /** Short orientation line when GPS Orientation Lite is active, else null. */
+    val orientation: String? = null,
 )
 
 /**
@@ -44,6 +46,7 @@ object AccessibilityStatusReducer {
         parts += ocrState(s)
         if (s.muted) parts += "Speech muted"
         if (s.navigating) parts += "Navigating"
+        s.orientation?.takeIf { it.isNotBlank() }?.let { parts += it.trimEnd('.') }
         return parts.joinToString(". ") + "."
     }
 
@@ -60,6 +63,7 @@ object AccessibilityStatusReducer {
             (if (s.awarenessActive) "pause awareness" else "start awareness") +
             ", repeat last alert, read text, scene question, " +
             (if (s.translationInstalled) "translation" else "translation (not installed)") +
+            ", " + (if (s.orientation != null) "repeat orientation" else "start orientation") +
             ", silence alerts, open debug status. Open the actions menu to choose."
 
     // --- Semantic state descriptions (stateDescription) ---

@@ -15,7 +15,23 @@ class AccessibilityStatusReducerTest {
         translation: Boolean = false,
         navigating: Boolean = false,
         lastAlert: String? = null,
-    ) = A11yState(awareness, muted, detector, ocr, translation, navigating, lastAlert)
+        orientation: String? = null,
+    ) = A11yState(awareness, muted, detector, ocr, translation, navigating, lastAlert, orientation)
+
+    @Test
+    fun currentStatus_appendsOrientation_whenActive() {
+        val line = AccessibilityStatusReducer.currentStatus(
+            state(orientation = "Orientation active. 1 o'clock · 40m"),
+        )
+        assertTrue(line.contains("Orientation active"))
+        assertTrue(line.contains("40m"))
+    }
+
+    @Test
+    fun availableActions_offersStartOrientation_thenRepeatWhenActive() {
+        assertTrue(AccessibilityStatusReducer.availableActions(state(orientation = null)).contains("start orientation"))
+        assertTrue(AccessibilityStatusReducer.availableActions(state(orientation = "Orientation active. x")).contains("repeat orientation"))
+    }
 
     @Test
     fun awarenessState_reflectsToggle() {

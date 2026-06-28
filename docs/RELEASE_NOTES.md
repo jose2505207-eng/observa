@@ -4,6 +4,21 @@ Offline-first, privacy-first AI vision assistant for blind and low-vision users.
 `main` shippable: each builds, passes unit tests, has **no `INTERNET` permission**, and launches in
 airplane mode with camera preview intact.
 
+## Unreleased — GPS Orientation Lite + Offline Translation readiness
+
+- **GPS Orientation Lite.** Real device GPS (`LocationManager`, no Play Services, **no INTERNET**) +
+  compass → heading/bearing/distance, clock-face guidance ("slight right, 1 o'clock, 40 meters"),
+  honest confidence (good / GPS low / compass calibrate). New `navigation/LocationProvider` +
+  `OrientationController`, reusing the existing `nav/` geometry. Surfaced as TalkBack/braille actions
+  (Start/Repeat/Stop orientation) + a live status line. Hazards always interrupt (NAVIGATION priority,
+  rate-limited). Added `ACCESS_FINE/COARSE_LOCATION` only (location ≠ network). Not turn-by-turn maps.
+- **Offline Translation Mode (honest readiness).** New `translation/TranslationModeController` +
+  `OfflineLanguagePackManager`: a readiness gate that never fakes a translation and never uses the
+  network — reports "ready offline" / "language pack missing" / "local speech unavailable". Engine +
+  packs deferred to offline-after-install provisioning (bundling ML Kit Translate would add INTERNET).
+- Operating layer extended with the new actions; `AccessibilityStatusReducer` carries orientation.
+  +8 unit tests (orientation 5, translation 3) and +2 reducer cases. Build/tests green; **no INTERNET**.
+
 ## v2.2.0 — QNN/NPU detector pipeline (export→load) + native accessibility layer (not yet tagged)
 
 ### QNN/NPU (real pipeline; not active on the production handset — honest fallback)

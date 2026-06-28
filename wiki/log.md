@@ -4,6 +4,32 @@ Newest entries first. Append an entry whenever you make a meaningful change to t
 
 ---
 
+## 2026-06-28 — GPS Orientation Lite + Offline Translation readiness
+
+Two user-facing features added without touching the detector, accessibility core, or no-INTERNET
+guarantee. Build + unit tests green (incl. 8 new tests); APK has `ACCESS_FINE/COARSE_LOCATION` but
+**no INTERNET**; detector still XNNPACK ~28 ms on device; operating layer intact.
+
+- **GPS Orientation Lite.** New `navigation/LocationProvider` (Android `LocationManager`, no Play
+  Services, satellite GPS = offline) + `navigation/OrientationController` (+`LocationSource` seam for
+  tests), reusing existing `nav/Geo`, `RelativeDirectionTranslator`, `GuidanceEngine`,
+  `SensorNavFixProvider` compass — no duplication. Heading/bearing/distance + clock-face guidance +
+  honest confidence. Emitted at NAVIGATION priority (hazards interrupt), rate-limited 4 s. TalkBack
+  actions Start/Repeat/Stop orientation; current-status node appends the live orientation line.
+  Manifest gained location perms only. `OrientationControllerTest` (5).
+- **Offline Translation Mode (honest).** New `translation/TranslationModeController` +
+  `OfflineLanguagePackManager` — a readiness gate (offline pack + local speech) that never fakes a
+  translation and never uses the network; status is "ready offline" / "language pack missing" /
+  "local speech unavailable". Engine/packs deferred to offline-after-install provisioning (ML Kit
+  Translate would add INTERNET). `TranslationModeControllerTest` (3).
+- `AccessibilityStatusReducer` carries orientation (+2 tests); operating layer + reducer updated.
+- Docs: `GPS_ORIENTATION.md`, `OFFLINE_TRANSLATION.md`, `demo/ORIENTATION_DEMO.md`,
+  `demo/TRANSLATION_DEMO.md`, presenter checklist, README, release notes.
+- Pending: live outdoor GPS guidance via the TalkBack action on device (logic unit-tested; app
+  launches with location granted, detector intact).
+
+---
+
 ## 2026-06-28 — NPU rescue: confirmed OS-level retail block via a second stack (LiteRT QNN)
 
 Attempted to make NPU real on the retail S25 Ultra. Found the device ships **signed vendor QNN 2.27.5**

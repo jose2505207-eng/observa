@@ -97,6 +97,20 @@ class ObservaController(context: Context) {
         voiceState = message
     }
 
+    // --- GPS Orientation Lite (real GPS + compass; offline) ---
+    private val locationProvider = com.observa.app.navigation.LocationProvider(appContext)
+    private val orientation = com.observa.app.navigation.OrientationController(
+        location = locationProvider,
+        heading = { val f = navFixProvider.current(); f.headingDeg to f.headingAccuracy },
+    )
+
+    // --- Offline Translation Mode (honest readiness; never fakes a translation) ---
+    private val langPacks = com.observa.app.translation.OfflineLanguagePackManager(appContext)
+    private val translation = com.observa.app.translation.TranslationModeController(
+        packs = { langPacks.hasAnyPack },
+        speechAvailable = { recognizer.available },
+    )
+
     // --- Compose-observable UI state (written on main thread only) ---
     var cameraActive by mutableStateOf(false); private set
     var frameCount by mutableLongStateOf(0L); private set
@@ -114,6 +128,8 @@ class ObservaController(context: Context) {
     var serviceStatus by mutableStateOf("normal rate"); private set
     var hapticMode by mutableStateOf(HapticGuidanceMode.NAVIGATION_LOCK_ON); private set
     var hotkeysEnabled by mutableStateOf(false); private set
+    var orientationActive by mutableStateOf(false); private set
+    var orientationLine by mutableStateOf("Orientation off"); private set
     val alerts = mutableStateListOf<String>()
 
     // --- Lock-on haptic guidance timing/state ---
@@ -223,9 +239,6 @@ class ObservaController(context: Context) {
 
     // --- Native accessibility operating layer (TalkBack custom actions / stable nodes) ---
 
-    /** Whether an on-device translation model is bundled. Honestly false (mode is a shell). */
-    val translationInstalled: Boolean = false
-
     /**
      * Short detector backend, mapped truthfully from the real inference status. Backed by a Compose
      * state set once the model finishes initializing, so the accessible status node recomposes and
@@ -244,9 +257,10 @@ class ObservaController(context: Context) {
         muted = muted,
         detector = detectorBackend,
         ocrReady = ocr.ready,
-        translationInstalled = translationInstalled,
+        translationInstalled = langPacks.hasAnyPack,
         navigating = navSession.active,
         lastAlert = if (lastAlert == "No alerts yet") null else lastAlert,
+        orientation = if (orientationActive) orientationLine else null,
     )
 
     /** Stable accessible node texts for the operating layer (derived by the pure reducer). */
@@ -259,10 +273,56 @@ class ObservaController(context: Context) {
     /** Honest scene question: a brightness-based summary (no scene VLM bundled yet — says so). */
     fun sceneQuestion() = describeScene()
 
-    /** Translation mode action — honestly reports that no on-device model is installed. */
-    fun startTranslation() = respond(
-        "Translation mode is not installed. No on-device translation model is bundled yet, and OBSERVA never uses the cloud.",
-    )
+    // --- Offline Translation Mode (honest readiness; never fakes a translation) ---
+    /** Truthful translation status: "ready offline" / "language pack missing" / "speech unavailable". */
+    val translationStatus: String get() = translation.statusLine()
+    fun startTranslation() = respond(translation.start())
+    fun stopTranslation() = respond(translation.stop())
+    fun repeatTranslation() = respond(translation.statusLine())
+
+    // --- GPS Orientation Lite (real GPS + compass; hazards always override) ---
+    fun startOrientation() {
+        navFixProvider.start()
+        orientationActive = true
+        val g = orientation.start()
+        orientationLine = orientation.statusLine()
+        emitNavGuidance(g)
+    }
+
+    fun stopOrientation() {
+        orientation.stop()
+        orientationActive = false
+        orientationLine = "Orientation off"
+        if (!navSession.active) navFixProvider.stop()
+        respond("Orientation off.")
+    }
+
+    fun repeatOrientation() {
+        if (!orientation.active) { respond("Orientation is off."); return }
+        orientationLine = orientation.statusLine()
+        emitNavGuidance(orientation.repeat())
+    }
+
+    /** One orientation guidance tick (NAVIGATION priority → a hazard always interrupts it). */
+    private fun orientationTick() {
+        if (!orientation.active || demoMode) return
+        orientation.tick(System.currentTimeMillis())?.let {
+            orientationLine = orientation.statusLine()
+            emitNavGuidance(it)
+        }
+    }
+
+    private fun emitNavGuidance(g: com.observa.app.nav.NavGuidance) {
+        voiceState = g.speech
+        router.emit(
+            OutputEvent(
+                priority = OutputPriority.NAVIGATION,
+                speech = g.speech,
+                braille = g.braille,
+                urgent = false,
+            )
+        )
+    }
 
     /** Silence non-hazard output. Hazards still fire (safety). Same path as the emergency pause. */
     fun silenceAlerts() = emergencyPause()
@@ -500,6 +560,7 @@ class ObservaController(context: Context) {
                 }
             }
             navigationTick()
+            orientationTick()
             delay(duty.analysisIntervalMs)
         }
     }
@@ -625,6 +686,8 @@ class ObservaController(context: Context) {
         executorch.close()
         ocr.close()
         navFixProvider.stop()
+        orientation.stop()
+        locationProvider.stop()
         speaker.shutdown()
     }
 

@@ -23,6 +23,8 @@ Android-native, low-latency, battery-conscious, on-device inference (ExecuTorch)
 - **Offline voice commands** (on-device recognizer): observing on/off, describe scene, what is ahead, read text, braille on/off/status, navigate to, stop navigation, where am I, repeat, mute/unmute, help.
 - **Foreground service** with a persistent honest notification ("running offline") + accessible Stop/Mute/Repeat, and an **adaptive battery/thermal duty cycle**.
 - **Offline guidance-first navigation**: clock-face, heading-relative guidance (real compass) to saved destinations, with honest GPS/compass uncertainty.
+- **GPS Orientation Lite**: real device-GPS heading/bearing/distance guidance ("slight right, 1 o'clock, 40 meters") via `LocationManager` (no Play Services, no INTERNET) + compass, surfaced as TalkBack/braille actions (Start/Repeat/Stop orientation); hazards always interrupt. Not turn-by-turn maps. See [`docs/implementation/GPS_ORIENTATION.md`](docs/implementation/GPS_ORIENTATION.md).
+- **Offline Translation Mode (honest readiness)**: a real readiness gate (offline language pack + local speech) that never fakes a translation and never uses the network — reports "ready offline" / "language pack missing" / "speech unavailable". See [`docs/implementation/OFFLINE_TRANSLATION.md`](docs/implementation/OFFLINE_TRANSLATION.md).
 - **No `INTERNET` permission** — the app physically cannot use the network (verified `aapt2`/`dumpsys`).
 
 **Honestly NOT done (no faking):**
