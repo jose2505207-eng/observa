@@ -36,6 +36,8 @@ Complete map of the OBSERVA wiki. Every page should be listed here.
 ## Features
 - [[ambient-awareness]] — Tier 1 continuous scene understanding.
 - [[spatial-guidance]] — guided interaction / aiming help.
+- [[offline-navigation]] — GPS + compass bearing guidance and offline map packs (v2.5.0).
+- [[offline-translation]] — on-device ML Kit translation + language-pack download (v2.5.0).
 - [[ocr-mode]] — text reading.
 - [[conversational-vision]] — ask-about-the-scene VLM.
 - [[voice-command-layer]] — voice control.
