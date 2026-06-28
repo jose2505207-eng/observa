@@ -12,7 +12,7 @@ Existing AI vision apps assume the user can already aim a camera at what matters
 
 Android-native, low-latency, battery-conscious, on-device inference (ExecuTorch).
 
-## Current status (v3 — real on-device model)
+## Current status (v2.0.0 — real on-device model)
 
 **Working today, verified on a Galaxy S25 Ultra (Snapdragon 8 Elite) in Airplane Mode:**
 - **Real on-device ML object detection** — YOLOv8n (COCO-80) exported to **ExecuTorch** (320×320, **XNNPACK** CPU delegate), bundled as `assets/models/observa_detector.pte` and run locally. Measured **median ~32 ms inference (p95 ~58 ms)**, under the 100 ms danger-recognition target; `forward backends=[XnnpackBackend]`. Person/vehicle/large-obstacle detections drive the hazard engine. (Brightness heuristic remains only as a no-model fallback.)

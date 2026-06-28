@@ -4,7 +4,7 @@ Newest entries first. Append an entry whenever you make a meaningful change to t
 
 ---
 
-## 2026-06-27 — v3.0.0 REAL on-device ExecuTorch inference (Agent 1 gate met)
+## 2026-06-27 — v2.0.0 REAL on-device ExecuTorch inference (Agent 1 gate met)
 
 Build + unit tests pass; no `INTERNET`; **device-verified on S25 Ultra (SM8750) in Airplane Mode**.
 

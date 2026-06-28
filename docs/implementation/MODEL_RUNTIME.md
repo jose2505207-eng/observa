@@ -63,13 +63,26 @@ this was the original blocker and is now fixed.
 
 ## QNN / NPU path (attempted, not shipped)
 
-The Qualcomm QNN SDK is present (`qairt/2.47.0.260601`) and the ExecuTorch QNN python backend imports.
-`scripts/export_detector.py --qnn` lowers the model to the QNN partitioner. **Not shipped because**
-a QNN-delegated `.pte` also needs the Qualcomm HTP runtime `.so`s (`libQnnHtp.so`, `libQnnSystem.so`,
-HTP v79 stub/skel for SM8750) packaged in the APK `jniLibs` — the bundled AAR ships only the ET↔QNN
-bridge lib, not the QNN runtime. Since XNNPACK CPU already meets the <100 ms target at 32 ms, QNN is a
-battery/headroom optimization, tracked as the next stretch. The app reports QNN status truthfully and
-never claims NPU acceleration it isn't using.
+Concrete attempt made for **SM8750 (Snapdragon 8 Elite, HTP v79)**:
+
+1. **Chipset supported:** `QcomChipset.SM8750` exists; the QNN SDK (`qairt/2.47.0.260601`) ships the
+   v79 runtime/skel libs (`libQnnHtpV79Stub.so`, `hexagon-v79/.../libQnnHtpV79Skel.so`, `libQnnHtp.so`,
+   `libQnnSystem.so`). `scripts/export_detector.py --qnn` uses the correct API:
+   `generate_qnn_executorch_compiler_spec(soc_model=QcomChipset.SM8750, backend_options=generate_htp_compiler_spec(use_fp16=True))`
+   then `to_edge_transform_and_lower(..., partitioner=[QnnPartitioner(spec)])`.
+2. **Blocker (host AOT lowering):** the partitioner's host op-support check constructs a host
+   `QnnManager` which fails with `RuntimeError: Failed to initialize QNN backend for kHtpBackend`,
+   even with `QNN_SDK_ROOT` set and `$QNN_SDK_ROOT/lib/x86_64-linux-clang` on `LD_LIBRARY_PATH`
+   (the x86 `libQnnHtp.so` deps all resolve via `ldd`). Root cause: the ExecuTorch QNN host pybind
+   extension in `executorch/.venv` is not built with working HTP host support against QNN SDK 2.47 —
+   fixing it means rebuilding ExecuTorch's QNN AOT extension, out of scope for this release.
+3. **Therefore not shipped.** A QNN `.pte` would also need the v79 device `.so`s in the APK
+   `jniLibs/arm64-v8a` (the AAR ships only the ET-to-QNN bridge lib). Since **XNNPACK CPU already meets
+   the <100 ms target at 32 ms**, QNN is a battery/thermal-headroom optimization, not a latency need.
+
+**Next step to unblock:** rebuild ExecuTorch's QNN host extension against QNN SDK 2.47, re-run `--qnn`,
+add the v79 runtime + skel `.so`s to `jniLibs`. The app reports QNN truthfully (`LOADED_QNN` only when
+`forward` backends include a QNN backend), so it lights up automatically once a QNN `.pte` loads.
 
 ## Reproduce the artifact
 

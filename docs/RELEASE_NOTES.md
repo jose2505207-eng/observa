@@ -4,7 +4,7 @@ Offline-first, privacy-first AI vision assistant for blind and low-vision users.
 `main` shippable: each builds, passes unit tests, has **no `INTERNET` permission**, and launches in
 airplane mode with camera preview intact.
 
-## v3.0.0 — real on-device ExecuTorch inference
+## v2.0.0 — real on-device ExecuTorch inference
 - **Ships a real local ML object detector.** YOLOv8n (COCO-80) → ExecuTorch, 320×320, **XNNPACK** CPU
   delegate, bundled as `assets/models/observa_detector.pte`. Verified on the Galaxy S25 Ultra
   (Snapdragon 8 Elite) in Airplane Mode: load ~11 ms, **inference median ~32 ms (p95 ~58 ms)**,

@@ -64,13 +64,21 @@ def main() -> int:
 
     backend_tag = "cpu-portable"
     if args.qnn:
-        # Requires the ExecuTorch QNN backend + Qualcomm SDK; see docs/real-detector.md.
+        # Lower to the Qualcomm QNN backend (HTP/NPU) for the Snapdragon 8 Elite (SM8750, HTP v79).
+        # Requires the Qualcomm QNN SDK ($QNN_SDK_ROOT) and its x86_64 host libs on LD_LIBRARY_PATH
+        # ($QNN_SDK_ROOT/lib/x86_64-linux-clang) so the partitioner's host op-support check can init
+        # the HTP backend. See docs/implementation/MODEL_RUNTIME.md for the device-lib packaging too.
         from executorch.backends.qualcomm.partition.qnn_partitioner import QnnPartitioner
-        from executorch.backends.qualcomm.utils.utils import generate_qnn_executorch_compiler_spec
-        edge = to_edge(exported).to_backend(
-            QnnPartitioner(generate_qnn_executorch_compiler_spec()))
-        backend_tag = "qnn"
-        print("[export] QNN partitioning applied")
+        from executorch.backends.qualcomm.utils.utils import (
+            generate_qnn_executorch_compiler_spec, generate_htp_compiler_spec)
+        from executorch.backends.qualcomm.serialization.qc_schema import QcomChipset
+        spec = generate_qnn_executorch_compiler_spec(
+            soc_model=QcomChipset.SM8750,
+            backend_options=generate_htp_compiler_spec(use_fp16=True),
+        )
+        edge = to_edge_transform_and_lower(exported, partitioner=[QnnPartitioner(spec)])
+        backend_tag = "qnn-htp"
+        print("[export] QNN HTP partitioning applied (SM8750 / HTP v79)")
     elif not args.no_xnnpack:
         # XNNPACK is the standard optimized CPU delegate; ~10-40x faster than portable reference
         # kernels on ARM. Bundled in the executorch.aar libexecutorch.so. No Qualcomm SDK needed.
