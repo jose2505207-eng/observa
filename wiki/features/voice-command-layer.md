@@ -12,7 +12,7 @@ owner: jose2505207-eng
 ## Current Reality
 Implemented and device-verified ("Voice: On-device ready" on the S25 Ultra).
 - **ASR:** `OfflineSpeechRecognizer` wraps Android `SpeechRecognizer`, prefers the on-device recognizer (`createOnDeviceSpeechRecognizer`, `EXTRA_PREFER_OFFLINE`); push-to-talk via the **Voice Command** button (`PushToTalkController`). Falls back to on-screen controls when unavailable.
-- **Parser:** deterministic offline `VoiceCommandParser` + `CommandRouter` (low-confidence confirmation; Stop/Cancel/Mute/Braille always available). Commands: start/stop observing, describe scene, what is ahead, read text, repeat, mute/unmute, braille on/off/status, help. Unbuilt features decline honestly.
+- **Parser:** deterministic offline `VoiceCommandParser` + `CommandRouter` (low-confidence confirmation; Stop/Cancel/Mute/Braille always available). Commands: start/stop observing, describe scene, what is ahead, read text, repeat, mute/unmute, braille on/off/status, **navigate to <place>, stop navigation, where am I**, help. Unbuilt features decline honestly.
 - **TTS:** `Speaker` (Android TextToSpeech) is the primary output channel; hazards flush the queue (barge-in / interruptible).
 - A known parser bug was fixed + regression-tested: "unmute" no longer matched "mute".
 

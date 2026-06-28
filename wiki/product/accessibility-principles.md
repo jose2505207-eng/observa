@@ -32,7 +32,7 @@ Non-negotiable rules for a non-visual-first product. These constrain every featu
 - Coexist with TalkBack, cane, guide dog, and existing navigation apps — don't fight them.
 
 ## Current Reality
-Largely realized in the output layer (device-verified): TTS speech (primary channel), stereo earcons, directional haptics, and a Braille/TalkBack polite live region — all via one unified router with hazard-priority interruption. High-contrast UI, `contentDescription`s, live regions, test tags, and an on-screen Observing/Braille/Audio/Haptics toggle set. Coexists with TalkBack. Still pending: physical Braille-display verification and a full human sensory pass.
+Largely realized in the output layer (device-verified): TTS speech (primary channel), stereo earcons, directional haptics incl. **progressive lock-on navigation haptics** (v1.9), and a Braille/TalkBack polite live region — all via one unified router with hazard-priority interruption. **Hands-free control** by voice (offline recognizer) and **foreground physical-button hotkeys** (v1.10, off by default; VolUp×1–4 = repeat/status/read-text/find-exit, VolDown×1–3 = mute/stop-nav/emergency-pause; see `docs/HOTKEYS.md`). High-contrast UI, `contentDescription`s, live regions, test tags, and on-screen toggles (Observing/Braille/Audio/Haptics/Button-shortcuts + haptic-mode). Coexists with TalkBack. Still pending: physical Braille-display verification and a full human sensory pass.
 
 ## Related
 - [[safety-principles]] · [[ambient-awareness]] · [[spatial-guidance]]

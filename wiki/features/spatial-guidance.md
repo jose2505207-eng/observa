@@ -13,7 +13,15 @@ owner: jose2505207-eng
 The **directional cue output layer is implemented** (device-verified); the **active aiming/orientation loop is not** — hence this feature is still `planned`.
 - Coarse direction (LEFT / CENTER / RIGHT) is derived for every detection from the normalized box center (`DirectionMapper`) and carried on hazard alerts.
 - Cues are emitted through `SpatialCueEngine`: stereo-**panned** synthesized audio (`AudioCuePlayer`, in-memory, offline) + **directional haptics** (`HapticCuePlayer`: left/right/forward/urgent-stop/confirm/error). Speech says the direction ("on your left/right/ahead"); non-speech cues keep working when speech is muted (safety). Throttled via `CueThrottler`; toggles for audio cues and haptics.
-- **Not built:** the closed-loop "orient toward a target" correction ("a little right… there"), and any precise localization beyond left/center/right.
+- **Not built:** precise localization beyond left/center/right of a detection.
+
+## Progressive lock-on haptics (v1.9, shipped)
+The closed-loop "orient toward a target" correction now exists for **navigation bearing**:
+`DirectionalLockHaptics` maps bearing error (route bearing − device heading) to a progressive cue —
+sparse when far off, faster/stronger ticks as you rotate toward the target, a distinct lock-on
+double-click when aligned, and "Aligned. Continue forward." Hazards always preempt it; poor compass
+suppresses fine ticks and is announced. Modes: off / safety-only / navigation-lock-on / full.
+See `docs/HAPTIC_LANGUAGE.md`. (Per-*detection* lock-on still awaits a real detector model.)
 
 ## Offline navigation (v1.7, shipped)
 Beyond per-detection direction, OBSERVA now has a **guidance-first offline navigation** layer:
