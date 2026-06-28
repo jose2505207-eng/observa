@@ -20,6 +20,8 @@ data class OrientationGuidance(
     val status: String,
     val confidence: OrientationConfidence,
     val arrived: Boolean,
+    /** Relative direction to face (for haptic feedback), or null when no fix yet. */
+    val direction: RelativeDirection? = null,
 )
 
 /**
@@ -76,6 +78,7 @@ class OrientationGuidanceEngine(private val arriveRadiusM: Double = 15.0) {
             status = "Orientation active. Destination ${dir.spoken}, $meters meters.",
             confidence = confidence,
             arrived = false,
+            direction = dir,
         )
     }
 

@@ -89,7 +89,10 @@ Mission cap honored: **no more than three clicks per button.**
 |---|---|---|
 | ×1 | Repeat last alert | Mute toggle |
 | ×2 | Current status | Stop navigation |
-| ×3 | Read text (OCR) | Emergency pause (hazards still fire) |
+| ×3 | **Open voice commands** | Emergency pause (hazards still fire) |
+
+**Tap volume‑up three times → voice commands** (requires "Button shortcuts" enabled). Then speak any
+command below.
 
 (A 4th press is intentionally unmapped → `NONE`. Find-exit moved to voice / front-tap.)
 
@@ -100,9 +103,12 @@ app. The app never *depends* on a tap it can't reliably receive — the guarante
 **TalkBack custom actions**, **voice**, and **volume hotkeys**. Full honesty table:
 [`docs/demo/ACCESSIBILITY_DEMO.md`](../demo/ACCESSIBILITY_DEMO.md).
 
-### Voice (offline, hold-to-talk)
-Whole-app control: observing on/off, describe scene, what is ahead, read text, find exit, braille
-on/off/status, navigate to, stop navigation, where am I, repeat, mute/unmute, help.
+### Voice (offline, hold-to-talk) — every feature is callable by voice
+Whole-app control: observing on/off, describe scene, what is ahead, read text, **read signs**, find
+exit, braille on/off/status, **start/stop navigation**, navigate to ‹place›, where am I, **start/stop
+translation** ("translate"), **download map**, **download ‹language›** (e.g. "download French"), repeat,
+mute/unmute, help. Opened by holding the mic button, the "Open voice commands" TalkBack action, or
+**volume‑up ×3**.
 
 ## Audio (spatial)
 Stereo-panned cues — left object → left ear, right → right, central danger → centered urgent tone.

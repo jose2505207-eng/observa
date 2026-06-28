@@ -2,6 +2,7 @@ package com.observa.app.navigation
 
 import android.content.Context
 import com.observa.app.nav.GeoPoint
+import com.observa.app.nav.SavedDestination
 import java.io.File
 
 /** A rendered/route-bearing area available offline. Empty when no map pack is provisioned. */
@@ -18,6 +19,30 @@ class OfflineMapRepository(
     private val packs: OfflineMapPackManager = OfflineMapPackManager(context),
 ) {
     private val packsDir: File get() = File(context.filesDir, OfflineMapPackManager.PACK_DIR)
+
+    /**
+     * Named places parsed from the installed offline map pack(s). Each `waypoint=lat,lon,name` line
+     * (written by the area-map download) becomes a [SavedDestination] the navigation system can guide
+     * to with compass + GPS bearing. Offline — just reads local files.
+     */
+    fun places(): List<SavedDestination> =
+        packsDir.takeIf { it.isDirectory }?.listFiles()
+            ?.filter { it.isFile && it.name.endsWith(OfflineMapPackManager.MAP_EXT) }
+            ?.flatMap { file ->
+                runCatching {
+                    file.readLines().mapNotNull { line ->
+                        val t = line.trim()
+                        if (!t.startsWith("waypoint=")) return@mapNotNull null
+                        val parts = t.removePrefix("waypoint=").split(",", limit = 3)
+                        if (parts.size < 3) return@mapNotNull null
+                        val lat = parts[0].toDoubleOrNull() ?: return@mapNotNull null
+                        val lon = parts[1].toDoubleOrNull() ?: return@mapNotNull null
+                        SavedDestination(parts[2].trim(), GeoPoint(lat, lon))
+                    }
+                }.getOrDefault(emptyList())
+            }
+            ?.distinctBy { it.name.lowercase() }
+            ?: emptyList()
 
     fun availableAreas(): List<OfflineMapArea> =
         packs.installedPacks().mapNotNull { name ->

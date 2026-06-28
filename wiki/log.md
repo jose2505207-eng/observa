@@ -4,6 +4,26 @@ Newest entries first. Append an entry whenever you make a meaningful change to t
 
 ---
 
+## 2026-06-29 — v3.1.0 — voice control everywhere, voice-to-voice translation, real area maps, nav haptics
+
+Tag **v3.1.0**. Big interaction + feature update on top of the NPU-active v3.0.0.
+
+- **Volume-up ×3 → voice commands** (`HotkeyCommand.VOICE_COMMANDS`).
+- **Every feature by voice:** start/stop navigation, start/stop translation, read signs, download map,
+  download ‹language› (any of ~45 via `LanguageCatalog`). Parser checks stop-variants before
+  start-variants. `CommandActions`/`CommandRouter` extended; `CommandRouterTest` updated.
+- **Real-time voice-to-voice translation:** `LiveVoiceTranslator` (listen → ML Kit translate → speak in
+  target language via `Speaker.speakIn` → loop; `swap` for two-way). Download any language
+  (`setTarget` + catalog). Honest about missing packs/voices.
+- **Real "map of where I am":** `MapDownloadController.downloadAreaMap(lat,lon)` pulls nearby named
+  places from the OSM Overpass API (provisioning/INTERNET only), stores offline, loads as nav
+  destinations (`OfflineMapRepository.places()`). Real place data, not rendered tiles — labeled so.
+- **Navigation haptics:** `SpatialCueEngine.navDirection` + `OrientationGuidance.direction` → left/right
+  turn pulses, forward buzz when aligned, arrival pattern; detection runs concurrently, hazards interrupt.
+- Build (both flavors) + 190 tests green; demoOffline no INTERNET; NPU detector unchanged (~2–3 ms).
+
+---
+
 ## 2026-06-29 — v3.0.0 — NPU-accelerated offline assistant (tagged)
 
 Milestone release. OBSERVA runs the YOLOv8n detector on the **Hexagon NPU** of the retail Galaxy S25

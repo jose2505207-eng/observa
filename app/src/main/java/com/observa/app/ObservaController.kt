@@ -115,7 +115,15 @@ class ObservaController(context: Context) {
 
     // --- Offline Translation Mode — real on-device ML Kit translation ---
     /** Real ML Kit translation + language-pack download (download needs the provisioning build). */
-    val languageDownloads = com.observa.app.translation.LanguageDownloadController()
+    private val mlkitTranslator = com.observa.app.translation.MlKitOnDeviceTranslator()
+    val languageDownloads = com.observa.app.translation.LanguageDownloadController(mlkitTranslator)
+    /** Real-time voice-to-voice translation (listen → translate offline → speak in target language). */
+    private val liveTranslator = com.observa.app.translation.LiveVoiceTranslator(
+        recognizer = recognizer,
+        translator = mlkitTranslator,
+        speakIn = { text, code -> speaker.speakIn(text, code) },
+        onState = { msg -> voiceState = msg },
+    )
     /** Real offline map-pack download/install (demo pack works offline; area maps need provisioning). */
     val mapDownloads = com.observa.app.maps.MapDownloadController(appContext)
     private val translation = com.observa.app.translation.TranslationModeController(
@@ -311,14 +319,21 @@ class ObservaController(context: Context) {
     val translationStatus: String get() = languageDownloads.statusLine()
     val translationPair: String get() = "${languageDownloads.sourceLang} to ${languageDownloads.targetLang}"
 
-    /** "Start translation": translate the demo phrase offline if ready, else say what's missing. */
+    /** "Start translation": begin real-time voice-to-voice translation if ready, else say what's missing. */
     fun startTranslation() {
         if (!languageDownloads.pairReady()) {
-            respond("${languageDownloads.statusLine()}. Open Download Languages to install ${languageDownloads.sourceLang} and ${languageDownloads.targetLang}.")
+            respond("${languageDownloads.statusLine()}. Say \"download ${com.observa.app.translation.LanguageCatalog.nameFor(languageDownloads.targetLang)}\" or open Download Languages first.")
             return
         }
-        translateText(com.observa.app.translation.LanguageDownloadController.DEMO_PHRASE)
+        // Live translation owns the mic; stop push-to-talk command listening first.
+        pushToTalk.onReleased()
+        respond("Live translation: ${com.observa.app.translation.LanguageCatalog.nameFor(languageDownloads.sourceLang)} to ${com.observa.app.translation.LanguageCatalog.nameFor(languageDownloads.targetLang)}. Speak now.")
+        liveTranslator.start(languageDownloads.sourceLang, languageDownloads.targetLang, continuous = true)
     }
+
+    /** Flip the live-translation direction for a two-way conversation. */
+    fun swapTranslationDirection() { liveTranslator.swap(); languageDownloads.swap() }
+    val liveTranslationActive: Boolean get() = liveTranslator.active
 
     /** Translate arbitrary text offline via ML Kit; speaks + shows the result. Never fabricates. */
     fun translateText(text: String) {
@@ -327,7 +342,7 @@ class ObservaController(context: Context) {
         languageDownloads.translate(text) { out -> respond(out) }
     }
 
-    fun stopTranslation() = respond("Translation stopped.")
+    fun stopTranslation() { liveTranslator.stop(); respond("Translation stopped.") }
     fun repeatTranslation() =
         respond(languageDownloads.lastTranslation.ifBlank { languageDownloads.statusLine() })
 
@@ -341,6 +356,31 @@ class ObservaController(context: Context) {
     fun downloadLanguages() {
         languageDownloads.downloadSelected()
         respond("Languages ${translationPair}: ${languageDownloads.statusLine()}. ${languageDownloads.detail}")
+    }
+
+    /** Voice: "download <language>" — set that language as the translation target and download it. */
+    fun downloadLanguageByName(name: String) {
+        val code = com.observa.app.translation.LanguageCatalog.codeFor(name)
+        if (code == null) { respond("Language $name is not supported on device."); return }
+        languageDownloads.setTarget(code)
+        languageDownloads.downloadSelected()
+        respond("Downloading ${com.observa.app.translation.LanguageCatalog.nameFor(code)} for offline translation. ${languageDownloads.detail}")
+    }
+
+    /** Voice / button: download a real offline map of the user's current GPS area (provisioning build). */
+    fun downloadCurrentAreaMap() {
+        val pt = locationProvider.current()
+        if (pt == null) { respond("No GPS fix yet. Go outside or near a window, then say download map again."); return }
+        respond("Downloading map for your current area…")
+        mapDownloads.downloadAreaMap(pt.lat, pt.lon) { msg ->
+            respond(msg)
+            refreshNavDestinationsFromMap()
+        }
+    }
+
+    /** Load named places from the installed offline map pack as navigation destinations. */
+    private fun refreshNavDestinationsFromMap() {
+        mapRepo.places().forEach { destinations.add(it) }
     }
 
     // --- Navigation Mode = GPS Orientation Lite + offline map-pack status (hazards always override) ---
@@ -390,6 +430,23 @@ class ObservaController(context: Context) {
                 urgent = false,
             )
         )
+        navHaptic(g) // directional haptic feedback so the user can FEEL which way to face
+    }
+
+    /** Directional haptic for navigation: left/right pulse to turn, forward when aligned, arrival buzz. */
+    private fun navHaptic(g: com.observa.app.navigation.OrientationGuidance) {
+        if (!hapticCuesEnabled) return
+        if (g.arrived) { spatialCue.navArrived(); return }
+        val cueDir = when (g.direction) {
+            com.observa.app.navigation.RelativeDirection.LEFT,
+            com.observa.app.navigation.RelativeDirection.SLIGHT_LEFT -> CueDirection.LEFT
+            com.observa.app.navigation.RelativeDirection.RIGHT,
+            com.observa.app.navigation.RelativeDirection.SLIGHT_RIGHT -> CueDirection.RIGHT
+            com.observa.app.navigation.RelativeDirection.AHEAD -> CueDirection.CENTER
+            else -> CueDirection.NONE // behind / no fix → no directional pulse
+        }
+        if (g.direction == com.observa.app.navigation.RelativeDirection.AHEAD) spatialCue.lockOn()
+        else if (cueDir != CueDirection.NONE) spatialCue.navDirection(cueDir)
     }
 
     /** Silence non-hazard output. Hazards still fire (safety). Same path as the emergency pause. */
@@ -708,6 +765,7 @@ class ObservaController(context: Context) {
             HotkeyCommand.REPEAT_LAST -> repeatLast()
             HotkeyCommand.STATUS -> announceBrailleStatus()
             HotkeyCommand.READ_TEXT -> { respond("Key: read text."); readText() }
+            HotkeyCommand.VOICE_COMMANDS -> { respond("Voice commands."); openVoiceCommands() }
             HotkeyCommand.FIND_EXIT -> { respond("Key: find exit."); findExit() }
             HotkeyCommand.MUTE_TOGGLE -> toggleMute()
             HotkeyCommand.STOP_NAVIGATION -> stopNavigation()
@@ -902,7 +960,13 @@ class ObservaController(context: Context) {
         override fun readText() = this@ObservaController.readText()
         override fun describeScene() = this@ObservaController.describeScene()
         override fun navigateTo(destination: String) = startNavigation(destination)
-        override fun stopNavigation() = this@ObservaController.stopNavigation()
+        override fun startNavigation() = startOrientation()
+        override fun stopNavigation() { this@ObservaController.stopNavigation(); stopOrientation() }
+        override fun startTranslation() = this@ObservaController.startTranslation()
+        override fun stopTranslation() = this@ObservaController.stopTranslation()
+        override fun downloadLanguage(language: String) = downloadLanguageByName(language)
+        override fun downloadMap() = downloadCurrentAreaMap()
+        override fun readSigns() = this@ObservaController.readSigns()
         override fun find(target: String) = respond("Object finding is not available yet.")
         override fun whereAmI() = this@ObservaController.whereAmI()
         override fun whatIsAhead() = this@ObservaController.whatIsAhead()

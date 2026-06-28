@@ -26,11 +26,27 @@ class Speaker(context: Context) {
         }
     }
 
-    /** Speak [text]. High-severity alerts flush the queue; others queue behind. */
+    /** Speak [text]. High-severity alerts flush the queue; others queue behind. Always English. */
     fun speak(text: String, urgent: Boolean = false) {
         if (muted || !ready) return
+        if (tts.language != Locale.US) tts.language = Locale.US // alerts are always English
         val mode = if (urgent) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
         tts.speak(text, mode, null, text.hashCode().toString())
+    }
+
+    /**
+     * Speak [text] in the given BCP-47 [languageCode] (for translated speech / voice-to-voice). If the
+     * voice for that language isn't installed, returns false so the caller can say so honestly. Not
+     * muted by the alert mute (translation output is user-requested), but skipped if TTS isn't ready.
+     */
+    fun speakIn(text: String, languageCode: String): Boolean {
+        if (!ready) return false
+        val loc = Locale.forLanguageTag(languageCode)
+        val avail = runCatching { tts.isLanguageAvailable(loc) }.getOrDefault(TextToSpeech.LANG_NOT_SUPPORTED)
+        if (avail < TextToSpeech.LANG_AVAILABLE) return false
+        tts.language = loc
+        tts.speak(text, TextToSpeech.QUEUE_ADD, null, text.hashCode().toString())
+        return true
     }
 
     fun stop() {

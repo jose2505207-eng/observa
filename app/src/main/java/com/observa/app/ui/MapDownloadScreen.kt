@@ -62,7 +62,7 @@ fun MapDownloadScreen(controller: ObservaController, onBack: () -> Unit) {
         if (maps.progressPercent in 1..99) Text("Progress: ${maps.progressPercent}%", color = Accent, fontSize = 14.sp)
 
         WideButton("Install Demo Map Pack", "Install the offline demo map pack now. Works without internet.", Accent) { maps.installDemoPack() }
-        WideButton("Download Area Map", "Download a real area map. Needs the Setup build with internet.", Panel) { maps.downloadAreaMap() }
+        WideButton("Download Map Of My Area", "Download real nearby places for your current GPS location. Needs the Setup build with internet.", Panel) { controller.downloadCurrentAreaMap() }
 
         Text("Installed packs", color = Accent, fontSize = 16.sp, fontWeight = FontWeight.Bold,
             modifier = Modifier.semantics { heading() })

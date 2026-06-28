@@ -9,7 +9,13 @@ interface CommandActions {
     fun readText()
     fun describeScene()
     fun navigateTo(destination: String)
+    fun startNavigation()
     fun stopNavigation()
+    fun startTranslation()
+    fun stopTranslation()
+    fun downloadLanguage(language: String)
+    fun downloadMap()
+    fun readSigns()
     fun find(target: String)
     fun whereAmI()
     fun whatIsAhead()
@@ -53,6 +59,7 @@ class CommandRouter(
             is CommandIntent.Unknown -> actions.confirm("Command not recognized. Say help.")
             // Safety / always-available commands bypass confirmation.
             is CommandIntent.Stop, is CommandIntent.Cancel, is CommandIntent.StopNavigation,
+            is CommandIntent.StopTranslation,
             is CommandIntent.Mute, is CommandIntent.Unmute,
             is CommandIntent.BrailleOn, is CommandIntent.BrailleOff, is CommandIntent.BrailleStatus,
             is CommandIntent.Help, is CommandIntent.Repeat -> execute(intent)
@@ -76,7 +83,13 @@ class CommandRouter(
             is CommandIntent.ReadText -> actions.readText()
             is CommandIntent.DescribeScene -> actions.describeScene()
             is CommandIntent.NavigateTo -> actions.navigateTo(intent.destination)
+            is CommandIntent.StartNavigation -> actions.startNavigation()
             is CommandIntent.StopNavigation -> actions.stopNavigation()
+            is CommandIntent.StartTranslation -> actions.startTranslation()
+            is CommandIntent.StopTranslation -> actions.stopTranslation()
+            is CommandIntent.DownloadLanguage -> actions.downloadLanguage(intent.language)
+            is CommandIntent.DownloadMap -> actions.downloadMap()
+            is CommandIntent.ReadSigns -> actions.readSigns()
             is CommandIntent.Find -> actions.find(intent.target)
             is CommandIntent.WhereAmI -> actions.whereAmI()
             is CommandIntent.WhatIsAhead -> actions.whatIsAhead()
@@ -96,6 +109,11 @@ class CommandRouter(
         is CommandIntent.ReadText -> "read text"
         is CommandIntent.DescribeScene -> "describe scene"
         is CommandIntent.NavigateTo -> "navigate to ${intent.destination}"
+        is CommandIntent.StartNavigation -> "start navigation"
+        is CommandIntent.StartTranslation -> "start translation"
+        is CommandIntent.DownloadLanguage -> "download language ${intent.language}"
+        is CommandIntent.DownloadMap -> "download map"
+        is CommandIntent.ReadSigns -> "read signs"
         is CommandIntent.Find -> "find ${intent.target}"
         is CommandIntent.WhereAmI -> "where am I"
         is CommandIntent.WhatIsAhead -> "what is ahead"

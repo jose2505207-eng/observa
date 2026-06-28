@@ -44,6 +44,12 @@ class SpatialCueEngine(
     fun lockOn() { if (hapticsEnabled) haptics.lockOn() }
     fun navArrived() { if (hapticsEnabled) haptics.arrived() }
 
+    /** Gentle directional pulse for navigation guidance (left/right to turn). Audio pans too. */
+    fun navDirection(direction: CueDirection) {
+        if (audioEnabled) audio.playCue(panOf(direction), urgent = false)
+        if (hapticsEnabled) haptics.forDirection(direction, urgent = false)
+    }
+
     override fun confirmation() {
         if (audioEnabled) audio.playConfirmation()
         if (hapticsEnabled) haptics.confirmation()

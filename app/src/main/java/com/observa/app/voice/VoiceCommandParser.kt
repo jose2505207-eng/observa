@@ -12,9 +12,19 @@ class VoiceCommandParser {
         val text = input.trim().lowercase()
         if (text.isEmpty()) return ParsedCommand(CommandIntent.Unknown(input), 0f)
 
-        // Parameterized commands first (they contain a destination/target).
+        // Parameterized commands first (they contain a destination/target/language).
+        downloadLanguage(text)?.let { return ParsedCommand(CommandIntent.DownloadLanguage(it), 0.9f) }
         navigateDestination(text)?.let { return ParsedCommand(CommandIntent.NavigateTo(it), 0.9f) }
         findTarget(text)?.let { return ParsedCommand(CommandIntent.Find(it), 0.9f) }
+
+        // New feature phrases. STOP variants must be checked before START variants, because the start
+        // keywords ("navigation"/"translation") are also substrings of "stop navigation"/"stop translation".
+        phrase(text, "download map", "download maps", "map here", "download this area")?.let { return it.to(CommandIntent.DownloadMap) }
+        phrase(text, "read sign", "read signs", "read the sign")?.let { return it.to(CommandIntent.ReadSigns) }
+        phrase(text, "stop translation", "end translation")?.let { return it.to(CommandIntent.StopTranslation) }
+        phrase(text, "stop navigation", "cancel navigation", "end navigation")?.let { return it.to(CommandIntent.StopNavigation) }
+        phrase(text, "start translation", "translate", "translation")?.let { return it.to(CommandIntent.StartTranslation) }
+        phrase(text, "start navigation", "start navigating", "navigate", "navigation")?.let { return it.to(CommandIntent.StartNavigation) }
 
         // Phrase-level commands (multi-word) before single keywords.
         phrase(text, "read text", "read this", "read")?.let { return it.to(CommandIntent.ReadText) }
@@ -42,6 +52,18 @@ class VoiceCommandParser {
         word(text, "no", "nope", "wrong")?.let { return it.to(CommandIntent.No) }
 
         return ParsedCommand(CommandIntent.Unknown(input), 0f)
+    }
+
+    private fun downloadLanguage(text: String): String? {
+        for (kw in listOf("download language ", "download the language ", "add language ", "download ")) {
+            val i = text.indexOf(kw)
+            if (i >= 0) {
+                val lang = text.substring(i + kw.length).trim()
+                // Only treat as a language download if it's not "download map".
+                if (lang.isNotEmpty() && !lang.startsWith("map")) return lang
+            }
+        }
+        return null
     }
 
     private fun navigateDestination(text: String): String? {

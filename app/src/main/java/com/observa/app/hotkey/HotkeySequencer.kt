@@ -5,7 +5,7 @@ enum class HotkeyButton { VOLUME_UP, VOLUME_DOWN }
 
 /** Commands triggered by counted key presses. */
 enum class HotkeyCommand {
-    REPEAT_LAST, STATUS, READ_TEXT, FIND_EXIT,
+    REPEAT_LAST, STATUS, READ_TEXT, FIND_EXIT, VOICE_COMMANDS,
     MUTE_TOGGLE, STOP_NAVIGATION, EMERGENCY_PAUSE,
     NONE,
 }
@@ -53,7 +53,7 @@ class HotkeySequencer(
             HotkeyButton.VOLUME_UP -> when (count) {
                 1 -> HotkeyCommand.REPEAT_LAST
                 2 -> HotkeyCommand.STATUS
-                3 -> HotkeyCommand.READ_TEXT
+                3 -> HotkeyCommand.VOICE_COMMANDS // tap volume-up 3x → open voice commands
                 else -> HotkeyCommand.NONE
             }
             HotkeyButton.VOLUME_DOWN -> when (count) {

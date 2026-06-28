@@ -1,5 +1,31 @@
 # OBSERVA release notes
 
+## v3.1.0 — voice control of everything, voice-to-voice translation, real area maps, nav haptics
+
+- **Volume‑up ×3 → voice commands.** Remapped the triple volume‑up hotkey to open hold‑to‑talk voice
+  commands (`HotkeyCommand.VOICE_COMMANDS`). Needs "Button shortcuts" enabled.
+- **Every feature callable by voice.** New intents in the offline grammar: start/stop navigation,
+  start/stop translation ("translate"), read signs, download map, **download ‹language›** (any of ~45
+  named languages → ML Kit codes via `LanguageCatalog`). Wired through `VoiceCommandParser` /
+  `CommandRouter` / `CommandActions` (stop‑variants parsed before start‑variants so "stop navigation"
+  isn't misread).
+- **Real‑time voice‑to‑voice translation.** `LiveVoiceTranslator`: listen (on‑device speech) → translate
+  offline (ML Kit) → **speak in the target language** (`Speaker.speakIn`) → listen again. Continuous;
+  `swap` flips direction for two‑way. Honest: says when a language pack or target TTS voice is missing,
+  never fabricates. Download **any** language (`LanguageDownloadController.setTarget` + catalog).
+- **Download a real map of where you are.** `MapDownloadController.downloadAreaMap(lat,lon)` fetches
+  nearby named places (shops/amenities/transit) around your GPS from the free **OSM Overpass API** (no
+  key; provisioning build / INTERNET only), stores them offline as map‑pack waypoints, and loads them as
+  **navigation destinations** (`OfflineMapRepository.places()`). Honest: real local place data, not
+  rendered street tiles. Works offline after the one‑time download.
+- **Full navigation feedback.** Directional **haptics** now fire with guidance (`navDirection`: left/right
+  pulse to turn, forward buzz when aligned, arrival pattern) on top of GPS+compass bearing speech, with
+  object detection running concurrently and hazards still interrupting.
+- Build (both flavors) + **190 tests** green (+ NewCommandsTest, LanguageCatalog). demoOffline has **no
+  INTERNET**; downloads gated to the provisioning build. NPU detector unchanged (~2–3 ms, active).
+
+
+
 Offline-first, privacy-first AI vision assistant for blind and low-vision users. All releases keep
 `main` shippable: each builds, passes unit tests, has **no `INTERNET` permission**, and launches in
 airplane mode with camera preview intact.

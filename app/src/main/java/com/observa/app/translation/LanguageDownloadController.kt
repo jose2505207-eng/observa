@@ -25,6 +25,12 @@ class LanguageDownloadController(private val engine: MlKitOnDeviceTranslator = M
     val setupMode: Boolean get() = BuildConfig.SETUP_MODE
 
     fun setPair(source: String, target: String) { sourceLang = source; targetLang = target; failed = false }
+    /** Set the target language (any ML Kit code); keeps the current source. */
+    fun setTarget(target: String) { targetLang = target; failed = false; refresh() }
+    /** Set the source language (any ML Kit code). */
+    fun setSource(source: String) { sourceLang = source; failed = false; refresh() }
+    /** Swap source/target (for two-way / reverse translation). */
+    fun swap() { val t = sourceLang; sourceLang = targetLang; targetLang = t }
 
     fun pairReady(): Boolean = installed.contains(sourceLang) && installed.contains(targetLang)
 

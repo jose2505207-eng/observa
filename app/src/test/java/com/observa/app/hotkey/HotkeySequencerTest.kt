@@ -11,7 +11,7 @@ class HotkeySequencerTest {
     @Test fun mappingMatchesGrammar() {
         assertEquals(HotkeyCommand.REPEAT_LAST, HotkeySequencer.map(HotkeyButton.VOLUME_UP, 1))
         assertEquals(HotkeyCommand.STATUS, HotkeySequencer.map(HotkeyButton.VOLUME_UP, 2))
-        assertEquals(HotkeyCommand.READ_TEXT, HotkeySequencer.map(HotkeyButton.VOLUME_UP, 3))
+        assertEquals(HotkeyCommand.VOICE_COMMANDS, HotkeySequencer.map(HotkeyButton.VOLUME_UP, 3))
         // Mission cap: no more than three clicks per volume button — a 4th press is unmapped.
         assertEquals(HotkeyCommand.NONE, HotkeySequencer.map(HotkeyButton.VOLUME_UP, 4))
         assertEquals(HotkeyCommand.MUTE_TOGGLE, HotkeySequencer.map(HotkeyButton.VOLUME_DOWN, 1))
@@ -26,7 +26,7 @@ class HotkeySequencerTest {
         assertTrue(s.onPress(HotkeyButton.VOLUME_UP, 0))
         assertTrue(s.onPress(HotkeyButton.VOLUME_UP, 200))
         assertTrue(s.onPress(HotkeyButton.VOLUME_UP, 400))
-        assertEquals(HotkeyCommand.READ_TEXT, s.flush()) // 3 presses → read text
+        assertEquals(HotkeyCommand.VOICE_COMMANDS, s.flush()) // 3 presses → voice commands
     }
 
     @Test fun debounceDropsTooFastRepeats() {
