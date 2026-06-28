@@ -10,11 +10,14 @@ owner: jose2505207-eng
 > Hands-free control of the whole app. Voice is a first-class input for non-visual use ([[accessibility-principles]]).
 
 ## Current Reality
-Implemented and device-verified ("Voice: On-device ready" on the S25 Ultra).
-- **ASR:** `OfflineSpeechRecognizer` wraps Android `SpeechRecognizer`, prefers the on-device recognizer (`createOnDeviceSpeechRecognizer`, `EXTRA_PREFER_OFFLINE`); push-to-talk via the **Voice Command** button (`PushToTalkController`). Falls back to on-screen controls when unavailable.
-- **Parser:** deterministic offline `VoiceCommandParser` + `CommandRouter` (low-confidence confirmation; Stop/Cancel/Mute/Braille always available). Commands: start/stop observing, describe scene, what is ahead, read text, repeat, mute/unmute, braille on/off/status, **navigate to <place>, stop navigation, where am I**, help. Unbuilt features decline honestly.
-- **TTS:** `Speaker` (Android TextToSpeech) is the primary output channel; hazards flush the queue (barge-in / interruptible).
-- A known parser bug was fixed + regression-tested: "unmute" no longer matched "mute".
+Implemented and device-verified ("Voice: On-device ready" on the S25 Ultra). As of **v3.1.0, every
+feature is reachable by voice.**
+- **Activation:** **Volume-up ×3** (`HotkeyCommand.VOICE_COMMANDS`) or the **Voice Command** button opens voice control. Push-to-talk via `PushToTalkController`.
+- **ASR:** `OfflineSpeechRecognizer` wraps Android `SpeechRecognizer`, prefers the on-device recognizer (`createOnDeviceSpeechRecognizer`, `EXTRA_PREFER_OFFLINE`). Falls back to on-screen controls when unavailable.
+- **Parser:** deterministic offline `VoiceCommandParser` + `CommandRouter` → `CommandActions` (low-confidence confirmation; Stop/Cancel/Mute/Braille always available). Commands: start/stop observing, describe scene, what is ahead, read text / **read signs**, repeat, mute/unmute, braille on/off/status, **start/stop navigation, navigate to <place>, where am I**, **start/stop translation**, **download map**, **download <language>** (any of ~45 via `LanguageCatalog` name→code), help. **Stop-variants are parsed before start-variants** so "stop navigation" is never misread as "start". Unbuilt features and missing packs decline honestly.
+- **Voice-to-voice translation:** "start translation" runs `LiveVoiceTranslator` (listen → ML Kit translate offline → `Speaker.speakIn` target language → loop); see [[offline-translation]].
+- **TTS:** `Speaker` (Android TextToSpeech) is the primary output channel; hazards flush the queue (barge-in / interruptible). `Speaker.speakIn(lang, …)` speaks in a target language for translation.
+- A known parser bug was fixed + regression-tested: "unmute" no longer matched "mute". Coverage in `CommandRouterTest`, `NewCommandsTest`, `LanguageCatalogTest`.
 
 ## Future Vision
 - Intent routing to more Tier 2 features ([[conversational-vision]]) and to permissioned skills ([[mcp-skill-system]]).

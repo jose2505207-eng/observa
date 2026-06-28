@@ -22,8 +22,15 @@ owner: jose2505207-eng
 - **Offline map packs** (`maps/` package + `ui/MapDownloadScreen`): visible **Download Map** →
   **Install Demo Map Pack** writes an offline OBSERVA waypoint bundle to `filesDir/map_packs/demo.map`
   (no network; honestly labeled "Demo offline map pack"). Status: not installed / downloading / ready
-  offline / corrupt / failed. "Ready offline" only after `MapPackVerifier` passes. **Download Area Map**
-  (real regional tiles) is honestly gated to the provisioning build.
+  offline / corrupt / failed. "Ready offline" only after `MapPackVerifier` passes.
+- **Download Area Map (v3.1.0):** `MapDownloadController.downloadAreaMap(lat,lon)` pulls the **real
+  named places around you** from the OSM **Overpass API** (provisioning/INTERNET only), stores them
+  offline as map-pack waypoints, and loads them as navigation destinations
+  (`OfflineMapRepository.places()`). Real place data — **not rendered tiles**, labeled honestly — and
+  it works offline after the one-time download.
+- **Navigation haptics (v3.1.0):** `SpatialCueEngine.navDirection` + `OrientationGuidance.direction` →
+  left/right **turn pulses**, a **forward buzz** when aligned, and an **arrival pattern**. Object
+  detection runs concurrently; hazards still interrupt.
 - **Safety:** object/hazard detection keeps running during navigation; hazards **interrupt** navigation
   speech (router priority `HAZARD > NAVIGATION > …` + `NavigationSafetyArbiter` hold window). Navigation
   guidance is rate-limited; hazards are immediate. Street signs/text: `StreetSignTracker` gates OCR by

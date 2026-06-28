@@ -4,6 +4,29 @@ Newest entries first. Append an entry whenever you make a meaningful change to t
 
 ---
 
+## 2026-06-28 — judge-readiness doc audit + APK published
+
+Final pre-judging audit. Code unchanged; brought the judge-facing docs in line with the shipped
+v3.1.0 reality and made the APK downloadable.
+
+- **Fixed stale "NPU not active" docs.** `docs/demo/DEMO_SCRIPT.md`, `docs/demo/FINAL_PRESENTER_CHECKLIST.md`
+  (which had said *"Do not claim NPU active"*), `docs/demo/AIRPLANE_MODE_DEMO.md`, `docs/current-status.md`,
+  and `docs/FINAL_DEMO.md` (which still said *"no ML model bundled, brightness heuristic"*) now reflect
+  YOLOv8n on the Hexagon NPU at ~2–3 ms (`backends=[QnnBackend]`).
+- **README** header v2.0.0 → v3.1.0; removed internal contradictions (translation/GPS were listed as
+  not-done though they work); added a **Get the APK (judges)** section and flavor-correct build commands.
+- **Wiki feature pages** updated for v3.1.0: `voice-command-layer` (volume-up ×3, every feature by voice,
+  stop-before-start parsing), `offline-translation` (voice-to-voice `LiveVoiceTranslator`, ~45 languages),
+  `offline-navigation` (real OSM Overpass area-map download, turn/arrival haptics).
+- **Fixed the wrong APK path** (`apk/debug/app-debug.apk` → flavor paths `apk/demoOffline|provisioning/debug/…`)
+  across the live demo docs. Old `docs/demo-script.md` marked SUPERSEDED.
+- **APK published** to a GitHub release on tag `v3.1.0`: both flavors (`demoOffline` no-INTERNET +
+  `provisioning`). Verified in-binary: demoOffline carries **no INTERNET** permission, provisioning has it,
+  and both bundle the QNN HTP v79 libs (NPU build). Historical journey docs (RELEASE_NOTES, NPU_DEBUG_REPORT,
+  QNN reverse-engineering log, device-validation) left intact as the record.
+
+---
+
 ## 2026-06-29 — v3.1.0 — voice control everywhere, voice-to-voice translation, real area maps, nav haptics
 
 Tag **v3.1.0**. Big interaction + feature update on top of the NPU-active v3.0.0.

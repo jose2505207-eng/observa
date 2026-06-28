@@ -1,4 +1,9 @@
-# OBSERVA — Demo Script
+# OBSERVA — Demo Script (SUPERSEDED)
+
+> **This early script is kept for history only.** The current judge-facing demo is
+> [`docs/demo/DEMO_SCRIPT.md`](demo/DEMO_SCRIPT.md) (v3.1.0 — NPU active, voice control everywhere,
+> voice-to-voice translation). The steps below predate the NPU and flavor split and should not be used
+> for a live demo.
 
 Title: **“OBSERVA: Local AI Eyes That Do Not Leak Your Life”**
 

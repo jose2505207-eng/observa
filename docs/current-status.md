@@ -1,10 +1,10 @@
 # OBSERVA — Current Status (honesty ledger)
 
-Last verified: 2026-06-27, on the target device **Samsung Galaxy S25 Ultra (SM-S938U1, Snapdragon 8 Elite SM8750, arm64-v8a)**, serial `R3CXC08009D`, in **Airplane Mode**, debug build.
+Status as of **v3.1.0** (2026-06-29). Target device **Samsung Galaxy S25 Ultra (SM-S938U1, Snapdragon 8 Elite SM8750, arm64-v8a)**, serial `R3CXC08009D`, in **Airplane Mode**, debug build.
 
 ## What works now (verified on device)
-- **Real on-device ML detector (NEW):** YOLOv8n (COCO-80) exported to **ExecuTorch** at 320×320 with the **XNNPACK** CPU delegate, bundled as `assets/models/observa_detector.pte` (12.7 MB) and loaded locally. Verified in logcat: `load success … forward backends=[XnnpackBackend]`, output tensor `[1, 84, 2100]` parsed by `YoloDetectionParser`. **Inference latency: ~26–43 ms, median ~32 ms** on the Snapdragon 8 Elite — under the 100 ms danger-recognition target. Runs in **Airplane Mode**. Detections (person/vehicle/large central obstacle) flow into the `HazardEngine`; the demo desk view produces `objects=0` honestly (no COCO hazard in frame).
-- **QNN / NPU:** the QNN delegate library is packaged; the current `.pte` is **XNNPACK CPU**, not QNN-delegated, so the app honestly reports QNN **off** (`forward backends=[XnnpackBackend]`, not `QnnBackend`). See `docs/implementation/MODEL_RUNTIME.md` for the QNN path and what it requires.
+- **Real on-device ML detector on the Hexagon NPU:** YOLOv8n (COCO-80) exported to **ExecuTorch** at 320×320, running on the **Qualcomm Hexagon NPU (HTP v79)** via the QNN backend, bundled as `assets/models/observa_detector.pte` and loaded locally. Verified in logcat: `forward backends=[QnnBackend]`, `QNN/NPU ACTIVE`, output tensor `[1, 84, 2100]` parsed by `YoloDetectionParser`. **Inference latency: ~2–3 ms** on the Snapdragon 8 Elite — ~10–15× faster than the CPU path and far under the 100 ms danger-recognition target. Runs in **Airplane Mode**. Detections (person/vehicle/large central obstacle) flow into the `HazardEngine`; an empty view produces `objects=0` honestly.
+- **QNN / NPU active:** the YOLOv8n detector runs on the Hexagon NPU. The enabler was `<uses-native-library android:name="libcdsprpc.so" android:required="false"/>` in the manifest, granting cDSP FastRPC access on Android 12+. `LOADED_QNN`/`npuActive` is set **only** after a real QNN warm-up `forward` succeeds; **XNNPACK CPU stays as the automatic fallback** (`required="false"`) on devices without the NPU path. See `docs/implementation/MODEL_RUNTIME.md` and `docs/implementation/NPU_DEBUG_REPORT.md`.
 - **Camera loop:** CameraX preview + `ImageAnalysis` (`STRATEGY_KEEP_ONLY_LATEST`, YUV_420_888); live on device. Frames **~1400+**, **FPS ~30**.
 - **Frame analysis:** per-frame luminance of left/center/right thirds computed on a background thread (no pixels stored or sent).
 - **Brightness heuristic (fallback only):** `HeuristicVisionRuntime` flags a markedly darker third as a possible obstacle. Deterministic proxy — **not** ML. Used **only** if the model is absent or fails to load.
@@ -21,9 +21,11 @@ Last verified: 2026-06-27, on the target device **Samsung Galaxy S25 Ultra (SM-S
 - The brightness heuristic is a fallback proxy for obstacles, not object recognition — used only when no model is loaded.
 
 ## What is NOT done (and the UI says so)
-- **QNN / Hexagon NPU acceleration:** not active. The model runs on the **XNNPACK CPU delegate** (32 ms, under target). QNN lowering is documented and the SDK is available, but a QNN `.pte` additionally requires the Qualcomm HTP runtime `.so`s packaged in the APK; the app never claims NPU acceleration unless `forward backends` reports a QNN backend.
 - **Doorway / stairs / curb / crosswalk detection:** not in the COCO-80 detector. Real person/vehicle/large-obstacle detection works; doors/stairs/curbs would need a model trained for them (documented future).
-- **Translation mode:** mode shell only; no on-device translation model bundled yet (documented as missing, never cloud).
+- **Turn-by-turn street routing:** navigation gives real GPS + compass orientation/bearing guidance and offline named-place destinations, not rendered map tiles or street-by-street routes.
+- **Physical Braille display** hardware: app-level live-region exposed and tested; no refreshable braille hardware verified yet.
+
+Now shipped (earlier "not done" items): **QNN/NPU acceleration active** (~2–3 ms), **real ML Kit offline translation** incl. voice-to-voice (`LiveVoiceTranslator`, ~45 languages), **real device-GPS navigation** with turn haptics, and **voice control of every feature** (volume-up ×3).
 
 > Note: OCR (on-device ML Kit, on demand) and offline voice commands (`OfflineSpeechRecognizer` + `VoiceCommandParser`) are implemented in code; re-verify on device in the demo loop.
 
@@ -31,4 +33,4 @@ Last verified: 2026-06-27, on the target device **Samsung Galaxy S25 Ultra (SM-S
 The `VisionRuntime` interface lets a real `ExecuTorchVisionRuntime` drop in behind the same engine/output with no UI changes. See [docs/implementation-plan.md](implementation-plan.md) and `docs/wiki-ready/Technical-Architecture.md`.
 
 ## How to reproduce
-See [docs/demo-script.md](demo-script.md) and `docs/wiki-ready/Validation-Gates.md`.
+See [docs/demo/DEMO_SCRIPT.md](demo/DEMO_SCRIPT.md), [docs/demo/AIRPLANE_MODE_DEMO.md](demo/AIRPLANE_MODE_DEMO.md), and `docs/wiki-ready/Validation-Gates.md`.
