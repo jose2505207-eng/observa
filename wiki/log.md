@@ -4,6 +4,29 @@ Newest entries first. Append an entry whenever you make a meaningful change to t
 
 ---
 
+## 2026-06-29 — v3.0.0 — NPU-accelerated offline assistant (tagged)
+
+Milestone release. OBSERVA runs the YOLOv8n detector on the **Hexagon NPU** of the retail Galaxy S25
+Ultra at **~2–3 ms** (`backends=[QnnBackend]`, real detections), fully offline. Tag **v3.0.0**.
+
+What v3.0.0 contains (relative to v2.5.0):
+- **QNN/NPU detector ACTIVE on device** — enabled by `<uses-native-library android:name="libcdsprpc.so"
+  android:required="false"/>` (Android 12+ cDSP FastRPC access). XNNPACK CPU stays as the automatic
+  fallback. `LOADED_QNN`/`npuActive` set only after a real warm-up forward; never faked.
+- **Structured backend diagnostics** (`inference/`: BackendKind/Stage/Attempt/Diagnostics/Selector,
+  single `OBSERVA_NPU` log tag) + visible **NPU Debug** screen (build/device identity, per-stage
+  attempts, exact blocker, Copy Debug Report).
+- **Live NPU usage graph** — **NPU Data** button + `NpuUsageTracker` + `NpuDataScreen` (latency +
+  throughput, honest: no fabricated utilization %).
+- Carries v2.5.0: visible Download Map / Download Languages, real ML Kit offline translation,
+  GPS+compass navigation, two flavors (demoOffline no-INTERNET / provisioning), blind-first gestures +
+  TalkBack operating layer.
+- **Honesty correction:** the earlier "retail device hard-blocks NPU (Outcome B)" conclusion was wrong
+  about the *cause* (it was the Android 12+ native-library rule, not a signing/PD block); docs corrected.
+- Build (both flavors) + 183 tests green; demoOffline has **no INTERNET**.
+
+---
+
 ## 2026-06-29 — 🎉 QNN/NPU detector ACTIVE on the S25 Ultra (blocker fixed)
 
 The NPU now runs the detector. Branch `fix-npu-runtime`.
