@@ -4,6 +4,26 @@ Offline-first, privacy-first AI vision assistant for blind and low-vision users.
 `main` shippable: each builds, passes unit tests, has **no `INTERNET` permission**, and launches in
 airplane mode with camera preview intact.
 
+## Unreleased — NPU Debug menu + structured backend diagnostics (release-blocker investigation)
+
+- **The app was NOT falling back to GPU.** There is **no GPU/Vulkan/LiteRT path compiled in** — the
+  only fallback is **XNNPACK CPU**, now clearly labeled. Fallback chain: ExecuTorch QNN → XNNPACK CPU.
+- **New `inference/` diagnostics package** (`BackendKind`, `BackendStage`, `BackendAttempt`,
+  `BackendDiagnostics`, `BackendSelector`). Every backend attempt is recorded per stage and logged under
+  one grep tag **`OBSERVA_NPU`** as `attempt=<backend> stage=<stage> success=<bool> detail=<msg>`.
+  Device-verified trace: `EXECUTORCH_QNN MODEL_LOAD success=true backends=[QnnBackend]` →
+  `WARMUP_FORWARD success=false` → `FALLBACK` → `XNNPACK_CPU ACTIVE success=true`. `npuActive()` is true
+  only after a real QNN `WARMUP_FORWARD`+`ACTIVE` — XNNPACK ACTIVE is reported as CPU, never NPU.
+- **New visible NPU Debug screen** (`ui/NpuDebugScreen.kt`), reachable from the **NPU Debug** button and
+  the **"Open NPU debug"** TalkBack action. Shows build/device identity, backend priority, per-stage
+  attempts, QNN `.pte` sha, and the exact blocker; controls: **Force QNN Attempt** (re-run init +
+  warm-up), **Copy Debug Report** (clipboard, for judges/Qualcomm), **GPU Fallback Disabled/Allowed**.
+  Accessible summary node. `BackendSelector.disableGpuFallback` defaults true.
+- **NPU still blocked** on the retail S25 Ultra (`skel 4000` / `device_handle 14001` at HTP device-handle
+  creation), proven model-independent and cross-stack (see `docs/implementation/NPU_DEBUG_REPORT.md`).
+  Detector runs XNNPACK CPU ~16–32 ms. Build (both flavors) + **177 tests** green; no INTERNET in
+  demoOffline. Not tagged NPU-complete.
+
 ## v2.5.0 — Offline map & language downloads, real ML Kit translation, two build flavors
 
 **The user can now see and use Download Map and Download Languages.** Navigation and translation are
