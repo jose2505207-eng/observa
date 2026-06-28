@@ -4,6 +4,35 @@ Newest entries first. Append an entry whenever you make a meaningful change to t
 
 ---
 
+## 2026-06-28 — Orientation + Translation: full named-module build-out
+
+Completed the GPS Orientation Lite and Offline Translation feature set into the explicit module
+structure, replacing the earlier "reuse existing classes" shortcut with real, single-responsibility,
+unit-tested modules (each composes — never duplicates — the pure `nav/` math). Build + 161 unit tests
+green; APK still has **no INTERNET** (only `ACCESS_FINE/COARSE_LOCATION`); detector + accessibility
+core untouched.
+
+- **`navigation/` (GPS Orientation Lite).** Added `CompassProvider` (real rotation-vector heading,
+  decoupled from the demo-location `SensorNavFixProvider`), `BearingCalculator` (six-way relative
+  direction: ahead / ahead-left / left / ahead-right / right / behind, delegating `nav/Geo`),
+  `OrientationGuidanceEngine` (mission vocabulary + good/weak-GPS/compass-unstable confidence),
+  `DestinationStore` (single configurable target, `setDestination(...)`), `NavigationSafetyArbiter`
+  (suppresses guidance for a hold window after a hazard). `OrientationController` rewritten to compose
+  them via `LocationSource`/`HeadingSource` seams. Tests: `OrientationControllerTest` (6, incl. hazard
+  suppression) + `OrientationGuidanceTest` (7).
+- **`translation/` (Offline Translation).** Added the honest pipeline `LocalSpeechRecognizer`,
+  `LanguageIdentifier`, `LocalTranslator` (honesty anchor — Unavailable, never fabricates),
+  `TranslationTurnManager`, `TranslationSpeechOutput`. `TranslationModeController` now gates on a third
+  fact — a local engine — adding the honest `Translation engine not installed` state. Tests:
+  `TranslationModeControllerTest` (4, incl. no-engine) + `TranslationPipelineTest` (4, incl. a real
+  injected engine translating + speaking).
+- `ObservaController` wires the new providers/pipeline; orientation guidance now passes `lastHazardMs`
+  to the arbiter. Docs (`GPS_ORIENTATION.md`, `OFFLINE_TRANSLATION.md`, both demo scripts, presenter
+  checklist, README, release notes) updated to the new modules/vocabulary.
+- Pending unchanged: live outdoor GPS guidance via the TalkBack action on device (logic unit-tested).
+
+---
+
 ## 2026-06-28 — GPS Orientation Lite + Offline Translation readiness
 
 Two user-facing features added without touching the detector, accessibility core, or no-INTERNET

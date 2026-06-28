@@ -99,16 +99,29 @@ class ObservaController(context: Context) {
 
     // --- GPS Orientation Lite (real GPS + compass; offline) ---
     private val locationProvider = com.observa.app.navigation.LocationProvider(appContext)
+    private val compassProvider = com.observa.app.navigation.CompassProvider(appContext)
     private val orientation = com.observa.app.navigation.OrientationController(
         location = locationProvider,
-        heading = { val f = navFixProvider.current(); f.headingDeg to f.headingAccuracy },
+        compass = compassProvider,
     )
 
     // --- Offline Translation Mode (honest readiness; never fakes a translation) ---
     private val langPacks = com.observa.app.translation.OfflineLanguagePackManager(appContext)
+    // No offline translation engine / language-ID model is bundled in the no-INTERNET runtime build,
+    // so these report unavailable honestly. A provisioning flavor would supply real ones.
+    private val localTranslator = com.observa.app.translation.LocalTranslator()
+    private val translationTurns = com.observa.app.translation.TranslationTurnManager(
+        speech = com.observa.app.translation.LocalSpeechRecognizer { recognizer.available },
+        identifier = com.observa.app.translation.LanguageIdentifier(),
+        translator = localTranslator,
+        output = com.observa.app.translation.TranslationSpeechOutput { respond(it) },
+        targetLanguage = "en",
+    )
     private val translation = com.observa.app.translation.TranslationModeController(
         packs = { langPacks.hasAnyPack },
         speechAvailable = { recognizer.available },
+        engineAvailable = { localTranslator.isReady() },
+        turns = translationTurns,
     )
 
     // --- Compose-observable UI state (written on main thread only) ---
@@ -282,37 +295,35 @@ class ObservaController(context: Context) {
 
     // --- GPS Orientation Lite (real GPS + compass; hazards always override) ---
     fun startOrientation() {
-        navFixProvider.start()
         orientationActive = true
         val g = orientation.start()
         orientationLine = orientation.statusLine()
-        emitNavGuidance(g)
+        emitOrientation(g)
     }
 
     fun stopOrientation() {
         orientation.stop()
         orientationActive = false
         orientationLine = "Orientation off"
-        if (!navSession.active) navFixProvider.stop()
         respond("Orientation off.")
     }
 
     fun repeatOrientation() {
         if (!orientation.active) { respond("Orientation is off."); return }
+        emitOrientation(orientation.repeat())
         orientationLine = orientation.statusLine()
-        emitNavGuidance(orientation.repeat())
     }
 
     /** One orientation guidance tick (NAVIGATION priority → a hazard always interrupts it). */
     private fun orientationTick() {
         if (!orientation.active || demoMode) return
-        orientation.tick(System.currentTimeMillis())?.let {
+        orientation.tick(System.currentTimeMillis(), lastHazardMs)?.let {
+            emitOrientation(it)
             orientationLine = orientation.statusLine()
-            emitNavGuidance(it)
         }
     }
 
-    private fun emitNavGuidance(g: com.observa.app.nav.NavGuidance) {
+    private fun emitOrientation(g: com.observa.app.navigation.OrientationGuidance) {
         voiceState = g.speech
         router.emit(
             OutputEvent(

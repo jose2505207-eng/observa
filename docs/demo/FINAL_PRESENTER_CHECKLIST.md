@@ -25,12 +25,14 @@ app says so. Do not claim NPU active.
 4. **Honest backend status.** "Open debug status" speaks
    `Detector backend: XNNPACK CPU fallback. QNN attempted: <skel 4000> ...`.
 5. **GPS Orientation Lite** (outdoors / near a window; grant location). Actions menu → **Start
-   orientation** → hear "Slight right, 1 o'clock. 40 meters." Rotate to see it update. Point at a
-   person → the hazard **interrupts** orientation (safety priority). It's heading/bearing/distance,
-   not maps; fully offline (satellite GPS).
+   orientation** → hear "Destination ahead-left, 40 meters. Turn slightly left." Rotate to see it
+   update. Point at a person → the hazard **interrupts** orientation (safety priority). It's
+   heading/bearing/distance with honest confidence (good / weak GPS / compass unstable), not maps;
+   fully offline (satellite GPS + compass).
 6. **Offline Translation Mode (honest).** Actions menu → **Start translation mode** → hears
    "Translation needs an offline language pack, which is not installed. OBSERVA never translates over
-   the network." Shows the mode is wired and truthful, not faked.
+   the network." The full offline turn pipeline is built (speech → language-ID → translate → speak),
+   only the engine/pack assets are deferred to a provisioning flavor. Wired and truthful, not faked.
 
 ## If asked about the NPU
 "We built the full QNN/NPU pipeline — the YOLOv8n raw head lowers to Qualcomm HTP, we ship a real

@@ -1,13 +1,9 @@
 package com.observa.app.navigation
 
 import com.observa.app.nav.GeoPoint
-import com.observa.app.nav.GuidanceEngine
-import com.observa.app.nav.HeadingAccuracy
 import com.observa.app.nav.GpsAccuracy
-import com.observa.app.nav.NavFix
-import com.observa.app.nav.NavGuidance
+import com.observa.app.nav.HeadingAccuracy
 import com.observa.app.nav.SavedDestination
-import com.observa.app.nav.DestinationStore
 
 /** Minimal location surface so [OrientationController] stays unit-testable (see [LocationProvider]). */
 interface LocationSource {
@@ -20,41 +16,50 @@ interface LocationSource {
 
 /**
  * GPS Orientation Lite — heading/bearing/distance guidance toward a destination. This is **not**
- * turn-by-turn maps: it reports which way to face and how far, using real device GPS ([LocationProvider])
- * + the compass heading, run through the existing pure [GuidanceEngine] / clock-face translator. Fully
- * offline (satellite GPS + sensors). Hazard alerts always take priority — orientation is emitted at
- * NAVIGATION priority through the same router, so a hazard interrupts it.
+ * turn-by-turn maps: it reports which way to face and how far, composing real device GPS
+ * ([LocationProvider]), the real compass ([CompassProvider]), pure geometry ([BearingCalculator]),
+ * the [OrientationGuidanceEngine], and a [DestinationStore]. Fully offline (satellite GPS + sensors).
  *
- * Updates are rate-limited ([minUpdateMs]) so TalkBack / braille are not flooded.
+ * Hazard safety: guidance is gated by [NavigationSafetyArbiter] and emitted at NAVIGATION priority, so
+ * a vision hazard always interrupts and is never talked over. Updates are rate-limited ([minUpdateMs])
+ * so TalkBack / braille are not flooded.
  */
 class OrientationController(
     private val location: LocationSource,
-    /** Supplies (headingDegrees, headingAccuracy) from the device compass. */
-    private val heading: () -> Pair<Double, HeadingAccuracy>,
-    private val destination: SavedDestination = DestinationStore.DEMO.first(),
-    private val guidance: GuidanceEngine = GuidanceEngine(),
+    private val compass: HeadingSource,
+    private val destinations: DestinationStore = DestinationStore(),
+    private val guidance: OrientationGuidanceEngine = OrientationGuidanceEngine(),
+    private val arbiter: NavigationSafetyArbiter = NavigationSafetyArbiter(),
     private val minUpdateMs: Long = 4_000L,
 ) {
     var active = false; private set
-    var lastGuidance: NavGuidance? = null; private set
+    var lastGuidance: OrientationGuidance? = null; private set
     private var lastEmitMs = 0L
 
-    val destinationName: String get() = destination.name
+    val destinationName: String get() = destinations.current.name
+
+    /** Repoint the demo destination (debug control). */
+    fun setDestination(destination: SavedDestination) = destinations.setDestination(destination)
 
     /** Begin orientation. Returns the opening guidance/status to speak. */
-    fun start(): NavGuidance {
+    fun start(): OrientationGuidance {
         active = true
         lastEmitMs = 0L
         location.start()
+        compass.start()
         val opening = if (!location.hasPermission)
-            NavGuidance(
-                "Orientation needs location permission to guide you.",
-                "Orientation: no location permission",
+            OrientationGuidance(
+                speech = "Orientation needs location permission to guide you.",
+                braille = "no location permission",
+                status = "Orientation: no location permission",
+                confidence = OrientationConfidence.WEAK_GPS,
                 arrived = false,
             )
-        else NavGuidance(
-            "Orientation on. Acquiring GPS toward ${destination.name}.",
-            "Orientation: acquiring GPS",
+        else OrientationGuidance(
+            speech = "Orientation on. Acquiring GPS toward ${destinationName}.",
+            braille = "acquiring GPS",
+            status = "Orientation active. Acquiring GPS.",
+            confidence = OrientationConfidence.WEAK_GPS,
             arrived = false,
         )
         lastGuidance = opening
@@ -64,15 +69,18 @@ class OrientationController(
     fun stop() {
         active = false
         location.stop()
+        compass.stop()
         lastGuidance = null
     }
 
     /**
-     * Called periodically by the processing loop. Returns guidance to emit, or null when inactive or
-     * still within the rate-limit window (so we never spam).
+     * Called periodically by the processing loop. Returns guidance to emit, or null when inactive,
+     * within the rate-limit window, or while a hazard owns the channel (so we never spam or talk over
+     * a safety alert). [lastHazardMs] is the timestamp of the most recent hazard (0 = none).
      */
-    fun tick(nowMs: Long): NavGuidance? {
+    fun tick(nowMs: Long, lastHazardMs: Long = 0L): OrientationGuidance? {
         if (!active) return null
+        if (!arbiter.guidanceAllowed(nowMs, lastHazardMs)) return null
         if (nowMs - lastEmitMs < minUpdateMs) return null
         lastEmitMs = nowMs
         val g = compute()
@@ -81,23 +89,23 @@ class OrientationController(
     }
 
     /** "Repeat orientation": the last guidance, or a fresh computation if none yet. */
-    fun repeat(): NavGuidance = if (active) (lastGuidance ?: compute().also { lastGuidance = it })
-    else NavGuidance("Orientation is off.", "Orientation off", arrived = false)
+    fun repeat(): OrientationGuidance =
+        if (active) (lastGuidance ?: compute().also { lastGuidance = it })
+        else OrientationGuidance(
+            "Orientation is off.", "Orientation off", "Orientation off",
+            OrientationConfidence.WEAK_GPS, arrived = false,
+        )
 
     /** Short, stable status line for the accessible status node. */
     fun statusLine(): String =
         if (!active) "Orientation off"
-        else "Orientation active. ${lastGuidance?.braille ?: "acquiring GPS"}"
+        else lastGuidance?.status ?: "Orientation active. Acquiring GPS."
 
-    private fun compute(): NavGuidance {
-        val point = location.current()
-        val (hdg, hacc) = heading()
-        val fix = NavFix(
-            point = point,
-            headingDeg = hdg,
-            headingAccuracy = hacc,
-            gps = if (point == null) GpsAccuracy.NONE else location.accuracy,
-        )
-        return guidance.guide(fix, destination)
-    }
+    private fun compute(): OrientationGuidance = guidance.guide(
+        current = location.current(),
+        headingDeg = compass.headingDegrees,
+        headingAccuracy = compass.accuracy,
+        gps = if (location.current() == null) GpsAccuracy.NONE else location.accuracy,
+        dest = destinations.current,
+    )
 }

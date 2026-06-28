@@ -6,6 +6,8 @@ import com.observa.app.nav.HeadingAccuracy
 import com.observa.app.nav.SavedDestination
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -22,16 +24,26 @@ class OrientationControllerTest {
         override fun current(): GeoPoint? = point
     }
 
+    private class FakeCompass(
+        override var headingDegrees: Double = 0.0,
+        override var accuracy: HeadingAccuracy = HeadingAccuracy.HIGH,
+    ) : HeadingSource {
+        var started = false
+        override fun start() { started = true }
+        override fun stop() { started = false }
+    }
+
     // Destination ~ north of the start point.
     private val dest = SavedDestination("test", GeoPoint(37.5710, 126.9780))
     private val start = GeoPoint(37.5665, 126.9780)
 
-    private fun controller(loc: FakeLocation) = OrientationController(
-        location = loc,
-        heading = { 0.0 to HeadingAccuracy.HIGH }, // facing north
-        destination = dest,
-        minUpdateMs = 0L,
-    )
+    private fun controller(loc: FakeLocation, compass: FakeCompass = FakeCompass()) =
+        OrientationController(
+            location = loc,
+            compass = compass,
+            destinations = DestinationStore(dest),
+            minUpdateMs = 0L,
+        )
 
     @Test
     fun offByDefault_repeatSaysOff() {
@@ -44,12 +56,15 @@ class OrientationControllerTest {
     @Test
     fun start_withGps_guidesTowardDestination() {
         val loc = FakeLocation(start, accuracy = GpsAccuracy.GOOD)
-        val c = controller(loc)
+        val compass = FakeCompass(headingDegrees = 0.0) // facing north
+        val c = controller(loc, compass)
         c.start()
         assertTrue(loc.started)
+        assertTrue(compass.started)
         val g = c.tick(1_000L)!!
-        // North-facing user, destination due north → straight ahead, with a distance in meters.
+        // North-facing user, destination due north → ahead, with a distance in meters.
         assertTrue(g.speech.contains("meters"))
+        assertTrue(g.speech.contains("ahead"))
         assertTrue(c.statusLine().startsWith("Orientation active"))
     }
 
@@ -64,21 +79,32 @@ class OrientationControllerTest {
     fun rateLimits_updates() {
         val c = OrientationController(
             location = FakeLocation(start),
-            heading = { 0.0 to HeadingAccuracy.HIGH },
-            destination = dest,
+            compass = FakeCompass(),
+            destinations = DestinationStore(dest),
             minUpdateMs = 5_000L,
         )
         c.start()
-        assertTrue(c.tick(10_000L) != null)   // first tick emits
-        assertTrue(c.tick(11_000L) == null)   // within window → suppressed (no braille flooding)
-        assertTrue(c.tick(16_000L) != null)   // after window → emits again
+        assertNotNull(c.tick(10_000L))   // first tick emits
+        assertNull(c.tick(11_000L))      // within window → suppressed (no braille flooding)
+        assertNotNull(c.tick(16_000L))   // after window → emits again
     }
 
     @Test
-    fun noGpsFix_reportsUnavailable_neverFakes() {
+    fun hazard_suppressesGuidance_safetyFirst() {
+        val c = controller(FakeLocation(start))
+        c.start()
+        // A hazard fired 100 ms ago → orientation must stay quiet (vision hazard beats navigation).
+        assertNull(c.tick(nowMs = 10_000L, lastHazardMs = 9_900L))
+        // Well after the hazard hold window → guidance resumes.
+        assertNotNull(c.tick(nowMs = 20_000L, lastHazardMs = 9_900L))
+    }
+
+    @Test
+    fun noGpsFix_reportsWeakGps_neverFakes() {
         val c = controller(FakeLocation(point = null, accuracy = GpsAccuracy.NONE))
         c.start()
         val g = c.tick(1_000L)!!
-        assertTrue(g.speech.contains("GPS unavailable"))
+        assertTrue(g.speech.contains("GPS signal weak"))
+        assertEquals(OrientationConfidence.WEAK_GPS, g.confidence)
     }
 }
