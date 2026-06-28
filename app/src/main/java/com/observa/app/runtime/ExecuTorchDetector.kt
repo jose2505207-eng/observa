@@ -55,6 +55,9 @@ class ExecuTorchDetector(
     /** Structured, grep-friendly (OBSERVA_NPU) backend diagnostics for the in-app NPU Debug screen. */
     val diagnostics = com.observa.app.inference.BackendDiagnostics()
 
+    /** Live per-inference latency/throughput for the NPU Data graph. */
+    val usage = com.observa.app.inference.NpuUsageTracker()
+
     // --- Diagnostics (read by the UI/Braille diagnostics surface) ---
     var modelBytes: Long = 0L; private set
     var modelVersion: String = "unknown"; private set
@@ -153,6 +156,9 @@ class ExecuTorchDetector(
                 loadMs = ms
                 backends = backendList
                 status = if (usesQnn) InferenceStatus.LOADED_QNN else InferenceStatus.LOADED_CPU
+                usage.reset()
+                usage.npuActive = usesQnn
+                usage.backendLabel = if (usesQnn) "QNN/NPU" else "XNNPACK CPU"
                 // ACTIVE is recorded only after a real warm-up forward succeeded.
                 diagnostics.record(attempt(kind, com.observa.app.inference.BackendStage.ACTIVE, true,
                     modelPath = cand.path, modelChecksum = checksum, message = "backends=[$backendList]"))
@@ -244,6 +250,7 @@ class ExecuTorchDetector(
             val out: Array<EValue> = m.forward(EValue.from(tensor))
             lastLatencyMs = SystemClock.elapsedRealtime() - t0
             latencySum += lastLatencyMs; latencyCount++
+            usage.record(lastLatencyMs.toFloat()) // live NPU/CPU latency for the NPU Data graph
             val outputs = out.filter { it.isTensor }.map {
                 val t = it.toTensor()
                 TensorOutput(t.shape(), t.dataAsFloatArray)

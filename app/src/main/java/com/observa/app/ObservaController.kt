@@ -510,6 +510,11 @@ class ObservaController(context: Context) {
     val gpuFallbackDisabled: Boolean get() = com.observa.app.inference.BackendSelector.disableGpuFallback
     fun announceCopied() = respond("NPU debug report copied to clipboard.")
 
+    /** Live NPU/detector usage snapshot for the NPU Data graph (latency + throughput + backend). */
+    fun npuUsageSnapshot() = executorch.usage.snapshot()
+    /** Speak the current live NPU usage (the NPU Data accessible summary / action). */
+    fun announceNpuUsage() = respond(executorch.usage.snapshot().summaryLine())
+
     /** Speak the engineering/debug detector status (kept out of normal alert output). */
     fun announceDebugStatus() = respond("$backendStatusLine. $qnnStageLine. ${aiDiagnostics}")
 

@@ -87,11 +87,13 @@ fun ObservaScreen(controller: ObservaController) {
         "map" -> MapDownloadScreen(controller, onBack = { screen = "main" })
         "lang" -> LanguageDownloadScreen(controller, onBack = { screen = "main" })
         "npu" -> NpuDebugScreen(controller, onBack = { screen = "main" })
+        "npudata" -> NpuDataScreen(controller, onBack = { screen = "main" })
         else -> MainScreen(
             controller,
             onOpenMap = { screen = "map" },
             onOpenLanguages = { screen = "lang" },
             onOpenNpu = { screen = "npu" },
+            onOpenNpuData = { screen = "npudata" },
         )
     }
 }
@@ -102,6 +104,7 @@ private fun MainScreen(
     onOpenMap: () -> Unit,
     onOpenLanguages: () -> Unit,
     onOpenNpu: () -> Unit,
+    onOpenNpuData: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -126,7 +129,7 @@ private fun MainScreen(
             modifier = Modifier.semantics { contentDescription = "Privacy: ${controller.privacyLabel}" },
         )
 
-        OperatingLayer(controller, onOpenNpu)
+        OperatingLayer(controller, onOpenNpu, onOpenNpuData)
 
         ModeButtons(controller, onOpenMap, onOpenLanguages)
 
@@ -140,7 +143,7 @@ private fun MainScreen(
         NavigationCard(controller)
         TranslationCard(controller)
         BrailleStatus(controller.brailleStatus)
-        DebugCard(controller, onOpenNpu)
+        DebugCard(controller, onOpenNpu, onOpenNpuData)
         Dashboard(controller)
         Controls(controller)
     }
@@ -277,7 +280,7 @@ private fun TranslationCard(controller: ObservaController) {
 
 /** Collapsible Debug/Status panel (Phase 10). Truthful backend, packs, sensors, permissions. */
 @Composable
-private fun DebugCard(controller: ObservaController, onOpenNpu: () -> Unit) {
+private fun DebugCard(controller: ObservaController, onOpenNpu: () -> Unit, onOpenNpuData: () -> Unit) {
     var open by remember { mutableStateOf(false) }
     Column(
         modifier = Modifier
@@ -287,6 +290,12 @@ private fun DebugCard(controller: ObservaController, onOpenNpu: () -> Unit) {
             .testTag("debugCard"),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
+        Button(
+            onClick = onOpenNpuData,
+            modifier = Modifier.fillMaxWidth().height(56.dp).testTag("npuDataButton")
+                .semantics { role = Role.Button; contentDescription = "Open NPU data screen. Live graph of NPU inference latency and throughput." },
+            colors = ButtonDefaults.buttonColors(containerColor = Good, contentColor = Bg),
+        ) { Text("NPU Data", fontSize = 18.sp, fontWeight = FontWeight.Bold) }
         Button(
             onClick = onOpenNpu,
             modifier = Modifier.fillMaxWidth().height(56.dp).testTag("npuDebugButton")
@@ -455,7 +464,7 @@ private fun BrailleStatus(status: String) {
  * live region) and braille status (polite live region) remain the push channels.
  */
 @Composable
-private fun OperatingLayer(controller: ObservaController, onOpenNpu: () -> Unit) {
+private fun OperatingLayer(controller: ObservaController, onOpenNpu: () -> Unit, onOpenNpuData: () -> Unit) {
     val actions = listOf(
         CustomAccessibilityAction("Start awareness") { controller.observe(true); true },
         CustomAccessibilityAction("Pause awareness") { controller.observe(false); true },
@@ -473,6 +482,8 @@ private fun OperatingLayer(controller: ObservaController, onOpenNpu: () -> Unit)
         CustomAccessibilityAction("Silence alerts") { controller.silenceAlerts(); true },
         CustomAccessibilityAction("Open debug status") { controller.announceDebugStatus(); true },
         CustomAccessibilityAction("Open NPU debug") { onOpenNpu(); true },
+        CustomAccessibilityAction("Open NPU data") { onOpenNpuData(); true },
+        CustomAccessibilityAction("Speak NPU usage") { controller.announceNpuUsage(); true },
     )
     Column(
         modifier = Modifier

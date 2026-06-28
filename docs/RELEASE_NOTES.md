@@ -21,6 +21,12 @@ airplane mode with camera preview intact.
   library. Detector parser switches to `yolo-raw-head` on the QNN path (decode on CPU), identical
   detections. Docs corrected: MODEL_RUNTIME, executorch-qnn (wiki), NPU_DEBUG_REPORT, README. 177 tests
   green. **This is genuinely NPU-active and may be tagged as such.**
+- **Live NPU usage graph** — new **NPU Data** button (+ "Open NPU data" / "Speak NPU usage" TalkBack
+  actions) opens `ui/NpuDataScreen`: a live Canvas line graph of per-inference latency (ms) plus
+  throughput (inferences/sec), min/max/avg, backend, and total. Backed by a thread-safe
+  `inference/NpuUsageTracker` fed from the detector (unit-tested, 4 tests). Honest by design — Android
+  exposes no DSP utilization %, so it charts measured latency/throughput, never a fabricated percentage;
+  accessible summary node + spoken-usage action carry the numbers for TalkBack. 183 tests green.
 
 ## Unreleased — NPU Debug menu + structured backend diagnostics (release-blocker investigation)
 
