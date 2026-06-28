@@ -4,6 +4,31 @@ Newest entries first. Append an entry whenever you make a meaningful change to t
 
 ---
 
+## 2026-06-28 — v1.9.0 progressive lock-on haptic navigation (v2 Part C)
+
+Branch `feature/v2-sensor-haptic-navigation`. Build + 116 unit tests pass; no `INTERNET`;
+device-verified launch on S25 Ultra in Airplane Mode (no crash).
+
+- `DirectionalLockHaptics` (pure): bearing error → progressive lock-on cue (searching / off-course /
+  approaching / near / aligned / arrived / hazard) with tick interval 900→500→250 ms and rising
+  amplitude; **hazard overrides** all nav haptics; poor/unreliable compass suppresses fine ticks and
+  is announced; low accuracy widens cadence + caps amplitude. `HapticGuidanceMode` (off / safety only
+  / navigation lock-on / full).
+- `HapticCuePlayer` gains `lockTick(amplitude)` (hardware amplitude via `hasAmplitudeControl`, on/off
+  fallback), `lockOn`, `arrived`; exposed through `SpatialCueEngine`.
+- `ObservaController.navigationTick` drives lock-on from the real device compass + speaks alignment
+  transitions ("Aligned. Continue forward.", "Compass accuracy poor. Use caution."); hazard recency
+  preempts nav ticks. Accessible "Haptic mode" cycle control in the nav panel.
+- `scripts/validate_production_apk.sh` (honest gate: build/tests/no-INTERNET hard-fail; model + map
+  pack are WARN until they land). `docs/HAPTIC_LANGUAGE.md`. Tests +10.
+
+**v2.0.0 gate NOT met (honest):** real detector model still unbundled (export toolchain IS
+pip-installable — `executorch` 1.3.1 — but a successful heavy `torch`/`torchvision` export AND a
+`.pte` that loads on our committed `executorch.aar` (version unstamped) AND an on-device detection is
+an unverified chain not closed this turn); real OSM offline map packs not built (demo location only);
+QNN not active; physical Braille not verified; lock-on haptic *feel* needs a human pass. **Not
+tagging v2.0.0.**
+
 ## 2026-06-28 — v1.8.0 production demo & release readiness
 
 Branch `feature/v1.8-final-production-demo`. Docs-only; build + 106 unit tests pass; no `INTERNET`.

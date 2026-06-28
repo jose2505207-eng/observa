@@ -437,6 +437,15 @@ private fun NavPanel(controller: ObservaController) {
                 colors = ButtonDefaults.buttonColors(containerColor = Panel, contentColor = OnDark),
             ) { Text("Stop nav", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
         }
+        Button(
+            onClick = { controller.cycleHapticMode() },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .testTag("hapticModeButton")
+                .semantics { contentDescription = "Haptic mode: ${controller.hapticModeLabel}. Double tap to change." },
+            colors = ButtonDefaults.buttonColors(containerColor = Panel, contentColor = OnDark),
+        ) { Text("Haptic mode: ${controller.hapticModeLabel}", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
     }
 }
 

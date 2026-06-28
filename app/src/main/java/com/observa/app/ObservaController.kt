@@ -16,6 +16,11 @@ import com.observa.app.accessibility.OutputPriority
 import com.observa.app.ocr.OcrEngine
 import com.observa.app.ocr.MlKitOcrEngine
 import com.observa.app.nav.DestinationStore
+import com.observa.app.nav.DirectionalLockHaptics
+import com.observa.app.nav.Geo
+import com.observa.app.nav.HapticGuidanceMode
+import com.observa.app.nav.HeadingAccuracy
+import com.observa.app.nav.LockState
 import com.observa.app.nav.NavigationSession
 import com.observa.app.nav.SensorNavFixProvider
 import com.observa.app.cue.AudioCuePlayer
@@ -103,7 +108,13 @@ class ObservaController(context: Context) {
     var audioCuesEnabled by mutableStateOf(true); private set
     var hapticCuesEnabled by mutableStateOf(true); private set
     var serviceStatus by mutableStateOf("normal rate"); private set
+    var hapticMode by mutableStateOf(HapticGuidanceMode.NAVIGATION_LOCK_ON); private set
     val alerts = mutableStateListOf<String>()
+
+    // --- Lock-on haptic guidance timing/state ---
+    @Volatile private var lastHazardMs = 0L
+    private var lastLockTickMs = 0L
+    private var lastLockState: LockState? = null
 
     val brailleStatus: String get() = router.brailleStatus.text
     val backendName: String get() = if (demoMode) "Demo (simulated)" else heuristic.name
@@ -280,18 +291,64 @@ class ObservaController(context: Context) {
     /** Emit one navigation guidance utterance if due. NAVIGATION priority → a hazard interrupts it. */
     private fun navigationTick() {
         if (!navSession.active || demoMode) return
-        val g = navSession.tick(navFixProvider.current(), System.currentTimeMillis()) ?: return
-        voiceState = g.speech
-        router.emit(
-            OutputEvent(
-                priority = OutputPriority.NAVIGATION,
-                speech = g.speech,
-                braille = g.braille,
-                urgent = false,
+        val now = System.currentTimeMillis()
+        val fix = navFixProvider.current()
+        val dest = navSession.destination
+
+        // Spoken/Braille distance guidance (throttled inside the session).
+        navSession.tick(fix, now)?.let { g ->
+            voiceState = g.speech
+            router.emit(
+                OutputEvent(
+                    priority = OutputPriority.NAVIGATION,
+                    speech = g.speech,
+                    braille = g.braille,
+                    urgent = false,
+                )
             )
-        )
-        if (g.arrived) navFixProvider.stop()
+            if (g.arrived) { spatialCue.navArrived(); navFixProvider.stop(); lastLockState = null; return }
+        }
+
+        // Progressive lock-on haptics (on top of speech), unless a hazard just fired.
+        if (dest == null || fix.point == null) return
+        val hazardRecent = now - lastHazardMs < 2_000L
+        if (!DirectionalLockHaptics.navigationEnabled(hapticMode)) return
+        val bearing = Geo.bearingDegrees(fix.point, dest.point)
+        val errorDeg = DirectionalLockHaptics.normalizeError(bearing - fix.headingDeg)
+        val cue = DirectionalLockHaptics.cue(errorDeg, fix.headingAccuracy, hazard = hazardRecent)
+        if (cue.state == LockState.HAZARD) return // hazard haptics own the channel
+
+        // Announce alignment transition + poor-compass once per change.
+        if (cue.state != lastLockState) {
+            when (cue.state) {
+                LockState.ALIGNED -> respond("Aligned. Continue forward.")
+                LockState.SEARCHING -> if (fix.headingAccuracy == HeadingAccuracy.UNRELIABLE)
+                    respond("Compass accuracy poor. Use caution.")
+                else -> {}
+            }
+            lastLockState = cue.state
+        }
+        if (cue.state == LockState.ALIGNED) {
+            if (now - lastLockTickMs >= cue.tickIntervalMs) { spatialCue.lockOn(); lastLockTickMs = now }
+        } else if (cue.tickIntervalMs > 0 && now - lastLockTickMs >= cue.tickIntervalMs) {
+            spatialCue.lockTick(cue.amplitude); lastLockTickMs = now
+        }
     }
+
+    /** Change the haptic guidance mode (UI/voice). */
+    fun applyHapticMode(mode: HapticGuidanceMode) {
+        hapticMode = mode
+        spatialCue.hapticsEnabled = DirectionalLockHaptics.safetyEnabled(mode)
+        respond("Haptic mode: ${mode.name.lowercase().replace('_', ' ')}.")
+    }
+
+    /** Cycle OFF → SAFETY_ONLY → NAVIGATION_LOCK_ON → FULL (accessible toggle). */
+    fun cycleHapticMode() {
+        val values = HapticGuidanceMode.values()
+        applyHapticMode(values[(hapticMode.ordinal + 1) % values.size])
+    }
+
+    val hapticModeLabel: String get() = hapticMode.name.lowercase().replace('_', ' ')
 
     private fun currentBrailleLine(): String =
         BrailleStatusPresenter.format(BrailleSnapshot(observing, muted, executorch.status.label))
@@ -389,6 +446,7 @@ class ObservaController(context: Context) {
         alerts.add(0, line)
         if (alerts.size > 6) alerts.removeAt(alerts.size - 1)
         val urgent = hazard.severity == Severity.HIGH
+        if (urgent) lastHazardMs = System.currentTimeMillis() // hazard haptics preempt nav lock-on
         // The router fans this to speech + Braille + the audio/haptic cue sink (cues fire even when
         // speech is muted, for safety). Direction steers panning/directional haptics.
         router.emit(

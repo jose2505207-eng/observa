@@ -66,6 +66,25 @@ class HapticCuePlayer(context: Context) {
         }
     }
 
+    /** A single lock tick; uses hardware amplitude control when available, else on/off fallback. */
+    fun lockTick(amplitude: Float) {
+        val v = vibrator ?: return
+        if (!v.hasVibrator()) return
+        val ms = 40L
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && v.hasAmplitudeControl()) {
+            val amp = (amplitude.coerceIn(0.05f, 1f) * 255).toInt().coerceIn(1, 255)
+            v.vibrate(VibrationEffect.createOneShot(ms, amp))
+        } else {
+            v.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE))
+        }
+    }
+
+    /** Distinct alignment "lock-on" double click. */
+    fun lockOn() = waveform(longArrayOf(0, 40, 60, 40))
+
+    /** Arrived pattern. */
+    fun arrived() = waveform(longArrayOf(0, 60, 40, 60, 40, 120))
+
     private fun oneShot(ms: Long) {
         val v = vibrator ?: return
         if (!v.hasVibrator()) return

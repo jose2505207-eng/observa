@@ -39,6 +39,11 @@ class SpatialCueEngine(
     fun cue(hazard: Hazard, nowMs: Long) =
         hazardCue(directionOf(hazard), hazard.severity == com.observa.app.hazard.Severity.HIGH, nowMs)
 
+    // --- Directional lock-on navigation haptics (gated by the haptics setting) ---
+    fun lockTick(amplitude: Float) { if (hapticsEnabled) haptics.lockTick(amplitude) }
+    fun lockOn() { if (hapticsEnabled) haptics.lockOn() }
+    fun navArrived() { if (hapticsEnabled) haptics.arrived() }
+
     override fun confirmation() {
         if (audioEnabled) audio.playConfirmation()
         if (hapticsEnabled) haptics.confirmation()
