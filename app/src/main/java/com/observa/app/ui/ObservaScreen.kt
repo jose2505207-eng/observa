@@ -51,8 +51,10 @@ import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
@@ -103,6 +105,8 @@ fun ObservaScreen(controller: ObservaController) {
 
         OperatingLayer(controller)
 
+        ModeButtons(controller)
+
         GestureHint(controller)
 
         BlindGestureLayer(controller) {
@@ -110,10 +114,183 @@ fun ObservaScreen(controller: ObservaController) {
         }
 
         AlertBanner(controller.lastAlert)
+        NavigationCard(controller)
+        TranslationCard(controller)
         BrailleStatus(controller.brailleStatus)
+        DebugCard(controller)
         Dashboard(controller)
         Controls(controller)
     }
+}
+
+/** High-contrast, TalkBack-labeled mode buttons — the visible blind-first hub. No icon-only controls. */
+@Composable
+private fun ModeButtons(controller: ObservaController) {
+    Column(
+        modifier = Modifier.fillMaxWidth().testTag("modeButtons"),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            BigActionButton("Awareness", if (controller.observing) "on" else "off",
+                if (controller.observing) "Pause awareness detection" else "Start awareness detection",
+                Modifier.weight(1f), if (controller.observing) Good else Accent,
+            ) { controller.observe(!controller.observing) }
+            BigActionButton("Navigate", if (controller.navigationModeActive) "on" else "off",
+                "Start navigation. Compass and GPS bearing guidance to a destination.",
+                Modifier.weight(1f), if (controller.navigationModeActive) Good else Accent,
+            ) { if (controller.navigationModeActive) controller.stopOrientation() else controller.startOrientation() }
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            BigActionButton("Translate", null,
+                "Start translation mode. Offline language readiness. ${controller.translationStatus}.",
+                Modifier.weight(1f), Accent,
+            ) { controller.startTranslation() }
+            BigActionButton("Voice Commands", null,
+                "Open voice commands. Speak a command after the prompt.",
+                Modifier.weight(1f), Accent,
+            ) { controller.openVoiceCommands() }
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            BigActionButton("Read Signs", null,
+                "Read text or street signs aloud. Point the camera and tap.",
+                Modifier.weight(1f), Accent, enabled = controller.ocrAvailable,
+            ) { controller.readSigns() }
+            BigActionButton("Repeat Alert", null, "Repeat the last spoken alert.",
+                Modifier.weight(1f), Panel) { controller.repeatLast() }
+        }
+    }
+}
+
+/** One large accessible button. [state] becomes stateDescription when present. */
+@Composable
+private fun BigActionButton(
+    label: String,
+    state: String?,
+    description: String,
+    modifier: Modifier,
+    container: Color,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier
+            .height(72.dp)
+            .testTag("mode_$label")
+            .semantics {
+                role = Role.Button
+                contentDescription = description
+                if (state != null) stateDescription = state
+            },
+        colors = ButtonDefaults.buttonColors(containerColor = container, contentColor = if (container == Panel) OnDark else Bg),
+    ) {
+        Text(label, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+/** Visible Navigation panel + its accessible "Navigation status" node. Start/Stop/Repeat. */
+@Composable
+private fun NavigationCard(controller: ObservaController) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Panel, RoundedCornerShape(12.dp))
+            .padding(16.dp)
+            .testTag("navigationCard")
+            .semantics(mergeDescendants = true) {
+                heading()
+                contentDescription = "Navigation status. ${controller.navStatusLine}"
+            },
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text("Navigation", color = Accent, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Text(controller.navStatusLine, color = Good, fontSize = 15.sp)
+        Text(controller.mapPackStatusLine, color = OnDark, fontSize = 14.sp)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SmallButton(if (controller.navigationModeActive) "Stop" else "Start",
+                if (controller.navigationModeActive) "Stop navigation" else "Start navigation", Modifier.weight(1f)) {
+                if (controller.navigationModeActive) controller.stopOrientation() else controller.startOrientation()
+            }
+            SmallButton("Repeat", "Repeat navigation guidance", Modifier.weight(1f),
+                enabled = controller.navigationModeActive) { controller.repeatOrientation() }
+        }
+    }
+}
+
+/** Visible Translation panel + its accessible "Translation status" node. Honest readiness. */
+@Composable
+private fun TranslationCard(controller: ObservaController) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Panel, RoundedCornerShape(12.dp))
+            .padding(16.dp)
+            .testTag("translationCard")
+            .semantics(mergeDescendants = true) {
+                heading()
+                contentDescription = "Translation status. ${controller.translationStatus}"
+            },
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text("Translation", color = Accent, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Text(controller.translationStatus, color = Good, fontSize = 15.sp)
+        Text("Source auto · Target English · offline only", color = OnDark, fontSize = 14.sp)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SmallButton("Start", "Start listening for translation", Modifier.weight(1f)) { controller.startTranslation() }
+            SmallButton("Stop", "Stop translation", Modifier.weight(1f)) { controller.stopTranslation() }
+            SmallButton("Repeat", "Repeat last translation status", Modifier.weight(1f)) { controller.repeatTranslation() }
+        }
+    }
+}
+
+/** Collapsible Debug/Status panel (Phase 10). Truthful backend, packs, sensors, permissions. */
+@Composable
+private fun DebugCard(controller: ObservaController) {
+    var open by remember { mutableStateOf(false) }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Panel, RoundedCornerShape(12.dp))
+            .padding(16.dp)
+            .testTag("debugCard"),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Button(
+            onClick = { open = !open; controller.announceDebugStatus() },
+            modifier = Modifier.fillMaxWidth().height(56.dp).testTag("debugStatusButton")
+                .semantics { role = Role.Button; contentDescription = "Debug status. Backend, packs, sensors, permissions." },
+            colors = ButtonDefaults.buttonColors(containerColor = Bg, contentColor = OnDark),
+        ) { Text(if (open) "Debug Status ▲" else "Debug Status ▼", fontSize = 18.sp, fontWeight = FontWeight.Bold) }
+        if (open) {
+            val lines = listOf(
+                controller.appVersionLine,
+                controller.backendStatusLine,
+                controller.qnnStageLine,
+                controller.qnnErrorLine,
+                controller.mapPackLine,
+                controller.languagePackLine,
+                controller.gpsStatusLine,
+                controller.compassStatusLine,
+                controller.ocrStatusLine,
+                controller.voiceStatusLine,
+                controller.internetStatusLine,
+                controller.readinessSummaryLine,
+            )
+            lines.forEach { Text(it, color = OnDark, fontSize = 13.sp,
+                modifier = Modifier.semantics { contentDescription = it }) }
+        }
+    }
+}
+
+@Composable
+private fun SmallButton(label: String, description: String, modifier: Modifier, enabled: Boolean = true, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.height(56.dp).semantics { role = Role.Button; contentDescription = description },
+        colors = ButtonDefaults.buttonColors(containerColor = Bg, contentColor = OnDark),
+    ) { Text(label, fontSize = 16.sp, fontWeight = FontWeight.Bold) }
 }
 
 /**
@@ -245,15 +422,15 @@ private fun OperatingLayer(controller: ObservaController) {
     val actions = listOf(
         CustomAccessibilityAction("Start awareness") { controller.observe(true); true },
         CustomAccessibilityAction("Pause awareness") { controller.observe(false); true },
-        CustomAccessibilityAction("Open voice commands") { controller.openVoiceCommands(); true },
-        CustomAccessibilityAction("Repeat last alert") { controller.repeatLast(); true },
-        CustomAccessibilityAction("Start OCR, read text") { controller.readText(); true },
-        CustomAccessibilityAction("Start scene question") { controller.sceneQuestion(); true },
-        CustomAccessibilityAction("Start translation mode") { controller.startTranslation(); true },
         CustomAccessibilityAction(
-            if (controller.orientationActive) "Repeat orientation" else "Start orientation",
-        ) { if (controller.orientationActive) controller.repeatOrientation() else controller.startOrientation(); true },
-        CustomAccessibilityAction("Stop orientation") { controller.stopOrientation(); true },
+            if (controller.navigationModeActive) "Stop navigation" else "Navigate",
+        ) { if (controller.navigationModeActive) controller.stopOrientation() else controller.startOrientation(); true },
+        CustomAccessibilityAction("Repeat navigation") { controller.repeatOrientation(); true },
+        CustomAccessibilityAction("Translate") { controller.startTranslation(); true },
+        CustomAccessibilityAction("Voice commands") { controller.openVoiceCommands(); true },
+        CustomAccessibilityAction("Read signs") { controller.readSigns(); true },
+        CustomAccessibilityAction("Repeat last alert") { controller.repeatLast(); true },
+        CustomAccessibilityAction("Start scene question") { controller.sceneQuestion(); true },
         CustomAccessibilityAction("Silence alerts") { controller.silenceAlerts(); true },
         CustomAccessibilityAction("Open debug status") { controller.announceDebugStatus(); true },
     )

@@ -28,9 +28,9 @@ class AccessibilityStatusReducerTest {
     }
 
     @Test
-    fun availableActions_offersStartOrientation_thenRepeatWhenActive() {
-        assertTrue(AccessibilityStatusReducer.availableActions(state(orientation = null)).contains("start orientation"))
-        assertTrue(AccessibilityStatusReducer.availableActions(state(orientation = "Orientation active. x")).contains("repeat orientation"))
+    fun availableActions_offersNavigate_thenStopWhenActive() {
+        assertTrue(AccessibilityStatusReducer.availableActions(state(orientation = null)).contains("navigate"))
+        assertTrue(AccessibilityStatusReducer.availableActions(state(orientation = "Orientation active. x")).contains("stop navigation"))
     }
 
     @Test
@@ -100,11 +100,12 @@ class AccessibilityStatusReducerTest {
         val a = AccessibilityStatusReducer.availableActions(state(awareness = true, translation = false))
         assertTrue(a.contains("pause awareness"))
         assertTrue(a.contains("repeat last alert"))
-        assertTrue(a.contains("read text"))
-        assertTrue(a.contains("scene question"))
-        assertTrue(a.contains("translation (not installed)"))
+        assertTrue(a.contains("read signs"))
+        assertTrue(a.contains("voice commands"))
+        assertTrue(a.contains("translate"))
+        assertTrue(a.contains("translation not installed"))
         assertTrue(a.contains("silence alerts"))
-        assertTrue(a.contains("open debug status"))
+        assertTrue(a.contains("debug status"))
         // When paused, the first action offered is to start awareness.
         assertTrue(AccessibilityStatusReducer.availableActions(state(awareness = false)).contains("start awareness"))
     }

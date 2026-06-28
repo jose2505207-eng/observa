@@ -17,6 +17,10 @@ Samsung/Android native braille stack (TalkBack → connected refreshable display
   *Start awareness · Pause awareness · **Open voice commands** · Repeat last alert · Start OCR (read
   text) · Start scene question · Start translation mode · Start/Repeat/Stop orientation · Silence
   alerts · Open debug status.*
+- **Control Strip actions (updated):** Start/Pause awareness · **Navigate** / Stop navigation · Repeat
+  navigation · **Translate** · **Voice commands** · **Read signs** · Repeat last alert · Scene question ·
+  Silence alerts · Debug status. Plus visible **Navigation status** and **Translation status** card
+  nodes (focusable headings carrying short truthful lines, e.g. "Navigation ready. Map pack missing").
 - **Two-layer input, blind-first:** these native actions are **Layer A — the guaranteed path** for
   TalkBack/braille users. Raw one-finger screen gestures (triple-tap voice, swipe-up translation,
   swipe-down navigation) are **Layer B**, wired **only when TalkBack is off** (when it's on, the

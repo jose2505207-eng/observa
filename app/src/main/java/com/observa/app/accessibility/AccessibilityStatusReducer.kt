@@ -61,10 +61,10 @@ object AccessibilityStatusReducer {
     fun availableActions(s: A11yState): String =
         "Available actions: " +
             (if (s.awarenessActive) "pause awareness" else "start awareness") +
-            ", open voice commands, repeat last alert, read text, scene question, " +
-            (if (s.translationInstalled) "translation" else "translation (not installed)") +
-            ", " + (if (s.orientation != null) "repeat orientation" else "start orientation") +
-            ", silence alerts, open debug status. Open the actions menu to choose."
+            ", " + (if (s.orientation != null) "stop navigation" else "navigate") +
+            ", translate, voice commands, read signs, repeat last alert, " +
+            (if (s.translationInstalled) "translation ready" else "translation not installed") +
+            ", silence alerts, debug status. Open the actions menu to choose."
 
     // --- Semantic state descriptions (stateDescription) ---
 

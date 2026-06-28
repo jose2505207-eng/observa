@@ -7,6 +7,23 @@ Brutally-simple, eyes-free control. Full gesture detail: [`docs/HOTKEYS.md`](../
 Always-on Awareness · OCR (on demand) · Pause/Silence · Repeat Last · Navigation (guidance-first) ·
 Translation (on-demand shell, no model yet). Scene-question/VLM: not bundled.
 
+## Visible mode buttons (sighted + low-vision, also TalkBack-labeled)
+
+The main screen now shows a high-contrast button hub (no icon-only controls; every button has
+`role=Button`, a `contentDescription`, and a `stateDescription` where relevant, 72 dp targets):
+
+| Button | Action |
+|---|---|
+| Awareness | start/stop the detector (`observe`) |
+| Navigate | start/stop Navigation Mode (compass + GPS bearing guidance) |
+| Translate | start Translation Mode (honest offline readiness) |
+| Voice Commands | `openVoiceCommands()` (hold-to-talk) |
+| Read Signs | one offline OCR pass; speaks sign text or "no readable sign text" |
+| Repeat Alert | repeat the last spoken alert |
+
+Below them: a **Navigation** card (live guidance + map-pack status + Start/Stop/Repeat), a
+**Translation** card (readiness + Start/Stop/Repeat), and a collapsible **Debug Status** card.
+
 ## Two-layer, blind-first input model
 
 OBSERVA uses **two layers** so that the guaranteed path never depends on a gesture the OS might

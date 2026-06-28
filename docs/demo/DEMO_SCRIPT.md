@@ -53,6 +53,16 @@ Enable **Airplane Mode**. Grant camera + mic.
   actions as guaranteed native accessibility actions — we never depend on a gesture TalkBack would
   swallow. And a hazard still interrupts any of it."*
 
+## Beat 6 — "Maps and Translate are right there" (40s)
+- Point at the screen: big buttons **Awareness · Navigate · Translate · Voice Commands · Read Signs ·
+  Repeat Alert**.
+- Tap **Navigate** → Navigation card shows live heading/bearing/distance ("Destination ahead-left, 40
+  meters") + map-pack status ("Map pack missing" — compass guidance still works). Tap **Translate** →
+  Translation card shows honest readiness. Tap **Debug Status** → backend, QNN stage, packs, GPS,
+  compass, OCR, voice, INTERNET (not declared), build sha/time.
+- Line: *"Navigation and translation are visible and operable — by button, by TalkBack action, or by
+  gesture — and every status is honest. Maps need a one-time pack; bearing guidance works offline now."*
+
 ## Close
 *"OBSERVA: real local AI vision for blind and low-vision users — offline, private, accessible by
 design."*

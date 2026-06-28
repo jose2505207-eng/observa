@@ -4,6 +4,29 @@ Offline-first, privacy-first AI vision assistant for blind and low-vision users.
 `main` shippable: each builds, passes unit tests, has **no `INTERNET` permission**, and launches in
 airplane mode with camera preview intact.
 
+## Unreleased — Visible Maps/Navigation + Translation UI, debug screen, sign reading
+
+- **Maps/Navigation and Translation are now visible and usable in the UI**, not just backend
+  controllers. New high-contrast, TalkBack-labeled mode buttons (`role=Button`, contentDescription,
+  stateDescription, 72 dp targets, no icon-only): **Awareness · Navigate · Translate · Voice Commands ·
+  Read Signs · Repeat Alert**. New **Navigation** card (live guidance + map-pack status + Start/Stop/
+  Repeat), **Translation** card (readiness + Start/Stop/Repeat), and a collapsible **Debug Status** card.
+- **Navigation Mode** = real compass + GPS bearing guidance (works with no map pack) + honest offline
+  map-pack status. New `navigation/NavigationModeController`, `OfflineMapPackManager` (not installed /
+  download required / corrupt / ready offline), `OfflineMapRepository`, `RouteGuidanceEngine` (honest
+  bearing fallback — never claims turn-by-turn without route data), `StreetSignTracker` (stability gate
+  so sign OCR never runs every frame / blocks hazards). Hazards still interrupt navigation
+  (`NavigationSafetyArbiter` + router priority).
+- **Read Signs** runs one real ML Kit OCR pass and speaks "Sign text: …" or "No readable sign text" —
+  never fabricated. No street-sign *detector* is bundled, so auto-trigger stays inactive (honest).
+- **Debug/Status screen** shows version + git sha + build time (new `BuildConfig.GIT_SHA`/`BUILD_TIME`),
+  detector backend, `QNN stage`, QNN error, map/language pack status, GPS, compass, OCR, voice, INTERNET
+  (not declared), and an offline-readiness summary (`OfflineReadinessChecker`).
+- Control Strip accessibility actions updated: Navigate / Repeat navigation / Translate / Voice commands
+  / Read signs / Repeat last alert / Silence alerts / Debug status.
+- Build + **170 tests** green (+ NavigationModulesTest: RouteGuidanceEngine, NavigationSafetyArbiter,
+  StreetSignTracker). **No INTERNET.** Detector XNNPACK ~22 ms. NPU still blocked (Outcome B); not tagged.
+
 ## Unreleased — QNN/NPU reverse-engineering (Outcome B) + stage instrumentation
 
 - **Reverse-engineered the skel-4000 failure end to end** (branch `npu-root-cause-reverse-engineering`;

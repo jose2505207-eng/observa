@@ -46,6 +46,15 @@ unsigned PD on that DSP and loads its skel. Running our model on the NPU would n
 signed/privileged/`userdebug` build or an OEM allowlist. So we run real on-device inference on XNNPACK
 CPU at ~22–32 ms — under the 100 ms danger target — and the app reports the backend honestly."
 
+## Maps / Translate visibility (the user's ask)
+- [ ] Main screen shows big labeled buttons: **Awareness · Navigate · Translate · Voice Commands ·
+  Read Signs · Repeat Alert**.
+- [ ] **Navigate** → Navigation card: heading/bearing/distance + "Map pack missing" (compass works
+  without a pack). **Translate** → Translation card: honest readiness. **Debug Status** → backend,
+  QNN stage, packs, GPS, compass, OCR, voice, INTERNET (not declared), build sha/time.
+- [ ] Everything also reachable via TalkBack Available Actions (Navigate, Translate, Voice commands,
+  Read signs) and via gestures when TalkBack is off.
+
 ## Blind-first gestures (TalkBack off only)
 - [ ] With TalkBack OFF, on the camera surface: triple-tap → voice; swipe up → translation; swipe
   down → orientation; double-tap → repeat. Hint line shows the gesture map.

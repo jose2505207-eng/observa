@@ -97,13 +97,21 @@ class ObservaController(context: Context) {
         voiceState = message
     }
 
-    // --- GPS Orientation Lite (real GPS + compass; offline) ---
+    // --- Navigation Mode = GPS Orientation Lite (real GPS + compass) + offline map-pack status ---
     private val locationProvider = com.observa.app.navigation.LocationProvider(appContext)
     private val compassProvider = com.observa.app.navigation.CompassProvider(appContext)
     private val orientation = com.observa.app.navigation.OrientationController(
         location = locationProvider,
         compass = compassProvider,
     )
+    private val mapPacks = com.observa.app.navigation.OfflineMapPackManager(appContext)
+    private val mapRepo = com.observa.app.navigation.OfflineMapRepository(appContext, mapPacks)
+    private val navigationMode = com.observa.app.navigation.NavigationModeController(
+        orientation = orientation,
+        mapStatus = { mapPacks.status() },
+        hasRenderableMap = { mapRepo.hasRenderableMap },
+    )
+    private val streetSigns = com.observa.app.navigation.StreetSignTracker()
 
     // --- Offline Translation Mode (honest readiness; never fakes a translation) ---
     private val langPacks = com.observa.app.translation.OfflineLanguagePackManager(appContext)
@@ -123,6 +131,20 @@ class ObservaController(context: Context) {
         engineAvailable = { localTranslator.isReady() },
         turns = translationTurns,
     )
+
+    // --- Offline readiness aggregation (setup/debug screen) ---
+    private val readiness = com.observa.app.translation.OfflineReadinessChecker {
+        listOf(
+            com.observa.app.translation.AssetReadiness(
+                com.observa.app.translation.OfflineReadinessChecker.DETECTOR,
+                modelNeedsPixels, executorch.status.label,
+            ),
+            com.observa.app.translation.AssetReadiness("OCR", ocr.ready, if (ocr.ready) "ML Kit" else "unavailable"),
+            com.observa.app.translation.AssetReadiness("Language pack", langPacks.hasAnyPack, translation.statusLine()),
+            com.observa.app.translation.AssetReadiness("Map pack", mapPacks.hasAnyPack, mapPacks.statusLine()),
+            com.observa.app.translation.AssetReadiness("Voice", recognizer.available, if (recognizer.available) "on-device" else "unavailable"),
+        )
+    }
 
     // --- Compose-observable UI state (written on main thread only) ---
     var cameraActive by mutableStateOf(false); private set
@@ -298,12 +320,19 @@ class ObservaController(context: Context) {
     fun stopTranslation() = respond(translation.stop())
     fun repeatTranslation() = respond(translation.statusLine())
 
-    // --- GPS Orientation Lite (real GPS + compass; hazards always override) ---
+    // --- Navigation Mode = GPS Orientation Lite + offline map-pack status (hazards always override) ---
+    /** Visible Navigation panel status: live guidance + honest map-pack line. */
+    val navStatusLine: String get() = navigationMode.statusLine()
+    /** Honest offline map-pack status ("Map ready offline" / "Map pack missing" / "corrupt"). */
+    val mapPackStatusLine: String get() = mapPacks.statusLine()
+    val navigationModeActive: Boolean get() = orientationActive
+
     fun startOrientation() {
         orientationActive = true
         val g = orientation.start()
         orientationLine = orientation.statusLine()
         emitOrientation(g)
+        respond("Navigation on. ${navigationMode.mapLine()}.")
     }
 
     fun stopOrientation() {
@@ -396,6 +425,31 @@ class ObservaController(context: Context) {
 
     /** Speak the engineering/debug detector status (kept out of normal alert output). */
     fun announceDebugStatus() = respond("$backendStatusLine. $qnnStageLine. ${aiDiagnostics}")
+
+    // --- Debug/Status screen lines (all truthful; never claim more than is real) ---
+    val qnnErrorLine: String get() = "QNN error: ${executorch.qnnError.ifBlank { "none" }}"
+    val mapPackLine: String get() = "Map pack: ${mapPacks.statusLine()}"
+    val languagePackLine: String get() = "Language pack: ${translation.statusLine()}"
+    val gpsStatusLine: String get() = "GPS: ${if (locationProvider.hasPermission) "permission granted" else "permission needed"}"
+    val compassStatusLine: String get() = "Compass: ${if (compassProvider.available) "available" else "unavailable"}"
+    val ocrStatusLine: String get() = "OCR: ${if (ocr.ready) "ready (ML Kit, offline)" else "unavailable"}"
+    val voiceStatusLine: String get() = "Voice: ${when {
+        !recognizer.available -> "unavailable"
+        recognizer.onDeviceOnly -> "on-device ready"
+        else -> "ready"
+    }}"
+    val internetStatusLine: String = "INTERNET permission: not declared (offline by design)"
+    val readinessSummaryLine: String get() = "Offline readiness: ${readiness.summaryLine()}"
+    val appVersionLine: String
+        get() = "Version ${com.observa.app.BuildConfig.VERSION_NAME} (${com.observa.app.BuildConfig.GIT_SHA}) · built ${com.observa.app.BuildConfig.BUILD_TIME}"
+
+    /**
+     * Read text / street signs on demand (the "Read Text / Signs" button). Same honest one-shot OCR as
+     * [readText] but framed for signage; never fabricates sign text — says so when nothing is readable.
+     */
+    fun readSigns() = runOcr("Reading signs…") { result ->
+        emitOcr(if (result.found) "Sign text: ${result.text}" else "No readable sign text.")
+    }
 
     /**
      * Capture one camera frame and run offline OCR on demand. Declines honestly if OCR is not

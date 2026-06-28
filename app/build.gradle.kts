@@ -19,6 +19,16 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Truthful build provenance for the Debug/Status screen.
+        val gitSha = providers.exec {
+            commandLine("git", "rev-parse", "--short", "HEAD")
+        }.standardOutput.asText.map { it.trim() }.orElse("unknown").get()
+        val buildTime = providers.exec {
+            commandLine("git", "show", "-s", "--format=%cd", "--date=format:%Y-%m-%d %H:%M", "HEAD")
+        }.standardOutput.asText.map { it.trim() }.orElse("unknown").get()
+        buildConfigField("String", "GIT_SHA", "\"$gitSha\"")
+        buildConfigField("String", "BUILD_TIME", "\"$buildTime\"")
     }
 
     buildTypes {
@@ -34,6 +44,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     packaging {
         jniLibs {

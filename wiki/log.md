@@ -4,6 +4,30 @@ Newest entries first. Append an entry whenever you make a meaningful change to t
 
 ---
 
+## 2026-06-29 — Maps/Navigation + Translation made visible in the UI; debug screen; sign reading
+
+The backend controllers existed but the user couldn't *see* Maps or Translate. Fixed: branch
+`feature/maps-translate-visible-ui`.
+
+- **Visible mode buttons** (high-contrast, `role=Button`, contentDescription/stateDescription, 72 dp,
+  no icon-only): Awareness · Navigate · Translate · Voice Commands · Read Signs · Repeat Alert.
+- **Navigation card** (live bearing guidance + map-pack status + Start/Stop/Repeat), **Translation
+  card** (readiness + Start/Stop/Repeat), collapsible **Debug Status card**.
+- New navigation modules: `NavigationModeController`, `OfflineMapPackManager` (not installed/download
+  required/corrupt/ready offline), `OfflineMapRepository`, `RouteGuidanceEngine` (honest bearing
+  fallback, never fakes turn-by-turn), `StreetSignTracker` (stability gate so sign OCR never runs every
+  frame). New `translation/OfflineReadinessChecker`. Navigation works with **no map pack** (compass
+  bearing); pack only adds the rendered/route layer; hazards still interrupt.
+- **Read Signs** = one real ML Kit OCR pass ("Sign text: …" / "No readable sign text"); never fabricated.
+- **Debug screen**: version + `BuildConfig.GIT_SHA`/`BUILD_TIME`, backend, QNN stage + error, map/lang
+  pack, GPS, compass, OCR, voice, INTERNET (not declared), offline-readiness summary.
+- Control Strip a11y actions updated (Navigate/Translate/Voice commands/Read signs/…).
+- Device-verified: mode buttons visible + labeled, detector ~22 ms XNNPACK, NPU one-shot still
+  skel 4000 → honest fallback. Build + 170 tests green; no INTERNET. NPU not active → not tagged.
+  New doc `docs/implementation/OFFLINE_MAPS.md`.
+
+---
+
 ## 2026-06-29 — QNN/NPU deep reverse-engineering → Outcome B (retail PD block), + stage instrumentation
 
 Branch `npu-root-cause-reverse-engineering`. Reverse-engineered the skel-4000 failure end to end
