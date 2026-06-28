@@ -143,7 +143,12 @@ class ObservaController(context: Context) {
     var hotkeysEnabled by mutableStateOf(false); private set
     var orientationActive by mutableStateOf(false); private set
     var orientationLine by mutableStateOf("Orientation off"); private set
+    /** Whether TalkBack / touch-exploration is on; drives the two-layer input model. UI keeps it fresh. */
+    var talkBackOn by mutableStateOf(false); private set
     val alerts = mutableStateListOf<String>()
+
+    // --- Blind-first two-layer input (raw gestures only when TalkBack is OFF) ---
+    private val gestures = com.observa.app.input.BlindGestureController(isTalkBackOn = { talkBackOn })
 
     // --- Lock-on haptic guidance timing/state ---
     @Volatile private var lastHazardMs = 0L
@@ -337,6 +342,43 @@ class ObservaController(context: Context) {
 
     /** Silence non-hazard output. Hazards still fire (safety). Same path as the emergency pause. */
     fun silenceAlerts() = emergencyPause()
+
+    // --- Blind-first two-layer input ---
+
+    /** UI reports TalkBack/touch-exploration state so raw gestures are only used when it's off. */
+    fun updateTalkBackOn(on: Boolean) { talkBackOn = on }
+
+    /** Status line the UI shows: gesture hints when TalkBack is off, native-actions pointer when on. */
+    val gestureStatusLine: String get() = gestures.statusLine()
+
+    /** True only when raw single-finger gestures should be wired (TalkBack off). */
+    val rawGesturesActive: Boolean get() = gestures.rawGesturesActive()
+
+    /** UI hands a completed tap count; mapped to a double/triple-tap gesture and dispatched. */
+    fun onTaps(count: Int) = gestures.tapGesture(count)?.let { onGesture(it) }
+
+    /** UI hands a vertical swipe delta (px, up negative); mapped to a swipe gesture and dispatched. */
+    fun onVerticalSwipe(dyPx: Float, thresholdPx: Float) =
+        gestures.swipeGesture(dyPx, thresholdPx)?.let { onGesture(it) }
+
+    /** Dispatch a raw gesture detected by the surface. No-op when TalkBack is on (returns NONE). */
+    fun onGesture(gesture: com.observa.app.input.BlindGesture) {
+        when (gestures.resolve(gesture)) {
+            com.observa.app.input.GestureAction.OPEN_VOICE -> openVoiceCommands()
+            com.observa.app.input.GestureAction.PUSH_TO_TALK -> openVoiceCommands()
+            com.observa.app.input.GestureAction.REPEAT_LAST -> repeatLast()
+            com.observa.app.input.GestureAction.START_TRANSLATION -> startTranslation()
+            com.observa.app.input.GestureAction.START_ORIENTATION -> startOrientation()
+            com.observa.app.input.GestureAction.NONE -> {}
+        }
+    }
+
+    /** Open hold-to-talk voice commands (the "triple tap" / native action entry point). */
+    fun openVoiceCommands() {
+        if (!recognizer.available) { respond("Voice unavailable. Use the on-screen actions menu."); return }
+        respond("Voice commands. Speak now.")
+        pushToTalk.onPressed()
+    }
 
     /** Truthful one-line backend status for current/debug surfaces. Never claims NPU unless active. */
     val backendStatusLine: String

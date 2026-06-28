@@ -36,12 +36,22 @@ app says so. Do not claim NPU active.
 
 ## If asked about the NPU
 "We built the full QNN/NPU pipeline — the YOLOv8n raw head lowers to Qualcomm HTP, we ship a real
-QnnBackend .pte and the v79 runtime. On this *retail* S25 Ultra the Hexagon DSP refuses to load an
-unsigned HTP skel from a third-party app (`error 4000`). We proved it's an OS-level lock, not our bug,
-two ways: ExecuTorch QNN and Google's official LiteRT Qualcomm delegate fail *identically*, while the
-phone's own camera loads DSP skels at the same moment. Running our model on the NPU would need a
-signed/privileged build or an engineering device. So we run real on-device inference on XNNPACK CPU at
-~32 ms — under the 100 ms danger target — and the app reports the backend honestly."
+QnnBackend .pte and the v79 runtime. We just re-verified the entire host+export chain from scratch
+(rebuilt the QNN host adaptor, re-exported the HTP model — both pass clean) and the .pte loads on the
+phone; the only failure is the on-device HTP **skel load** (`error 4000`). On this *retail* S25 Ultra
+the Hexagon DSP refuses to load an unsigned HTP skel from a third-party app. We proved it's an
+OS-level lock, not our bug or a build artifact, two ways: ExecuTorch QNN and Google's official LiteRT
+Qualcomm delegate fail *identically*, while in the same logcat the phone's own camera opens an
+unsigned PD on that DSP and loads its skel. Running our model on the NPU would need a
+signed/privileged/`userdebug` build or an OEM allowlist. So we run real on-device inference on XNNPACK
+CPU at ~22–32 ms — under the 100 ms danger target — and the app reports the backend honestly."
+
+## Blind-first gestures (TalkBack off only)
+- [ ] With TalkBack OFF, on the camera surface: triple-tap → voice; swipe up → translation; swipe
+  down → orientation; double-tap → repeat. Hint line shows the gesture map.
+- [ ] With TalkBack ON, the hint flips to "Gestures available through TalkBack actions," and every
+  action (incl. **Open voice commands**) is in the TalkBack actions menu. Never depend on raw
+  one-finger gestures while TalkBack is on.
 
 ## Hard rules
 - [ ] Never say "NPU active" — the status node is the source of truth.

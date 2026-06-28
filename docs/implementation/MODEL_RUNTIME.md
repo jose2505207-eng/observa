@@ -167,6 +167,28 @@ QNN stacks fail identically**, so on this handset the NPU is unreachable by any 
 (Priorities 1–4 all blocked). The LiteRT experiment was reverted (it adds ~40 MB and does not work);
 the reproducible evidence lives here. NPU would require a signed/privileged build or an OEM allowlist.
 
+### 2026-06-29 fresh re-validation (laptop-crash hypothesis ruled out)
+
+The user suspected the NPU might be broken because the laptop crashed mid-build. Re-audited from
+scratch — **rebuilt/re-ran every host+export stage and repeated the device test**:
+
+| Stage | Command | Fresh result |
+|---|---|---|
+| Env intact | `echo $QNN_SDK_ROOT` | `/home/ivancito/Qualcomm/qairt/2.47.0.260601` (SDK, `executorch/` tree, `.venv`, device all present) |
+| Host pybind rebuild | `cd executorch/build-x86 && make PyQnnManagerAdaptor` | exit 0, `[100%] Built target PyQnnManagerAdaptor` |
+| QNN raw-head re-export | `python scripts/export_detector.py --qnn-raw-head --imgsz 320 --out <tmp>` | exit 0, all ops `\| True`, `backend=qnn-htp (SM8750 / HTP v79)`, valid 6.9 MB `.pte` (6,887,296 bytes; sha differs from bundled only due to QNN-compiler non-determinism — functionally identical) |
+| `.pte` loads on device | install + run, logcat | `Deserializing … QnnContextCustomProtocol`, `Creating new backend bundle` — **loads** |
+| HTP skel load | same run | **fails fresh**: `QnnDsp <E> Failed to load skel, error: 4000` → `Failed to create device_handle for Backend ID 6, error=14001` → `Init failed for backend QnnBackend: 0x1` |
+| App behavior | same run | falls back honestly: `XNNPACK CPU. QNN attempted: [ExecuTorch Error 0x1] …`; per-frame `OBSERVA_MODEL inference ~25 ms (avg)` |
+| Counter-proof (DSP works) | same logcat | signed camera HAL opens an **unsigned PD** on cDSP (`Successfully opened /vendor/dsp/cdsp/fastrpc_shell_unsigned_3`, `Created user PD on domain 7 … Unsigned:Y`) and loads `libbitml_nsp_79na_skel.so` |
+| Device skel inventory | `adb shell find /vendor /system … -iname "*Htp*Skel*"` | HTP v79 skels exist **only** in vendor-signed paths (`/vendor/lib64/rfs/dsp/snap/libQnnHtpV79Skel.so`, `/vendor/lib64/hw/audio/…`) |
+
+**Verdict:** every host/export stage passes freshly after a clean rebuild, and the only failure is the
+device-side HTP skel load — a security gate that the same chip grants to a signed system process in
+the same instant. The block is the **retail S25 Ultra's DSP/protection-domain policy**, not the laptop
+crash, not the export, not the app. NPU would light up automatically on a signed/privileged/`userdebug`
+build or an OEM-allowlisted device, because `LOADED_QNN` is set only on a real QNN warm-up `forward`.
+
 ## Reproduce the artifact
 
 ```bash

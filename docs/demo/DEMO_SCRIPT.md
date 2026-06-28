@@ -36,10 +36,22 @@ Enable **Airplane Mode**. Grant camera + mic.
 ## Beat 4 — "We chased the NPU honestly" (40s)
 - Open debug status: *"Detector backend: XNNPACK CPU fallback. QNN attempted: skel load 4000."*
 - Line: *"The full Qualcomm QNN/NPU pipeline is in the app — a real HTP-lowered model plus the v79
-  runtime. We proved the retail DSP blocks third-party NPU access two independent ways (ExecuTorch QNN
-  and Google's official LiteRT Qualcomm delegate both fail identically, while the camera uses the DSP
-  fine). It needs a signed/engineering build. So we fall back to CPU and tell the truth — no fake
-  acceleration."*
+  runtime. We re-verified the whole host+export pipeline from scratch (rebuilt the QNN host adaptor,
+  re-exported the HTP model — both pass) and the `.pte` loads on device; only the on-device skel load
+  is refused. We proved it's the retail DSP blocking third-party NPU access two independent ways
+  (ExecuTorch QNN and Google's official LiteRT Qualcomm delegate fail identically), and in the same
+  logcat the signed camera process uses that very DSP. It needs a signed/engineering build. So we fall
+  back to CPU and tell the truth — no fake acceleration."*
+
+## Beat 5 — "Blind-first gestures, two layers" (40s)
+- With TalkBack **off**: triple-tap the camera → *"Voice commands. Speak now."*; swipe up → translation
+  status; swipe down → orientation. The hint line reads *"Triple tap for voice commands. Swipe up
+  translation. Swipe down navigation."*
+- Turn TalkBack **on**: the hint flips to *"Gestures available through TalkBack actions,"* and the same
+  actions appear in the TalkBack actions menu (incl. **Open voice commands**).
+- Line: *"Raw gestures are a convenience when no screen reader is running; blind users get the same
+  actions as guaranteed native accessibility actions — we never depend on a gesture TalkBack would
+  swallow. And a hazard still interrupts any of it."*
 
 ## Close
 *"OBSERVA: real local AI vision for blind and low-vision users — offline, private, accessible by

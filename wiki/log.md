@@ -4,6 +4,35 @@ Newest entries first. Append an entry whenever you make a meaningful change to t
 
 ---
 
+## 2026-06-29 — NPU re-audit (laptop-crash ruled out) + blind-first two-layer gestures
+
+User feared the laptop crash-during-build broke the NPU. Re-audited the whole QNN pipeline from
+scratch and repeated the device test. **It is not a build artifact.**
+
+- **Host rebuild:** `cd executorch/build-x86 && make PyQnnManagerAdaptor` → `[100%] Built target`
+  (clean). Env intact (`QNN_SDK_ROOT=…/qairt/2.47.0.260601`, `.venv`, device all present).
+- **Re-export:** `python scripts/export_detector.py --qnn-raw-head --imgsz 320` → exit 0, every op
+  `| True`, valid 6.9 MB `qnn-htp (SM8750/HTPv79)` `.pte` (6,887,296 bytes; sha differs from bundled
+  only due to QNN-compiler non-determinism — functionally identical).
+- **Device:** reinstalled, ran. The `.pte` **loads** (`Deserializing … QnnContextCustomProtocol`),
+  HTP init fails **fresh**: `QnnDsp <E> Failed to load skel, error: 4000` → `device_handle … 14001` →
+  `Init failed for backend QnnBackend`. App falls back to XNNPACK (~22 ms avg) and reports it.
+- **Counter-proof:** same logcat shows the signed Samsung camera open an unsigned PD on the cDSP
+  (`/vendor/dsp/cdsp/fastrpc_shell_unsigned_3`, `Created user PD … Unsigned:Y`) and load
+  `libbitml_nsp_79na_skel.so`. Device HTP v79 skels live only in vendor-signed paths. → **retail
+  OS/DSP protection-domain block**, needs signed/privileged/userdebug build or OEM allowlist.
+- **Tag state:** `v2.2.0` already exists (→ `c4e5b4b`, CPU-only) with an *honest* annotation
+  (XNNPACK fallback, retail DSP block). NOT re-tagged as NPU-complete; NPU is not active on device.
+
+**Blind-first gestures.** New pure, unit-tested `input/BlindGestureController` (5 tests). Layer A =
+native actions (+ **Open voice commands**). Layer B = raw gestures wired **only when TalkBack off**
+(triple-tap voice, swipe-up translation, swipe-down orientation, double-tap repeat, long-press PTT),
+tracked via `AccessibilityManager.isTouchExplorationEnabled`; TalkBack-on shows "Gestures available
+through TalkBack actions." Device-verified: detector ~22 ms, gesture hint + "open voice commands"
+present in the live a11y tree. Build + 166 tests green; no INTERNET. Docs/wiki updated.
+
+---
+
 ## 2026-06-28 — Orientation + Translation: full named-module build-out
 
 Completed the GPS Orientation Lite and Offline Translation feature set into the explicit module

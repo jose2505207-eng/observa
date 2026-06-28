@@ -14,8 +14,15 @@ Samsung/Android native braille stack (TalkBack → connected refreshable display
   `AccessibilityStatusReducer`. The Available-actions node carries Compose
   **`CustomAccessibilityAction`s** so a TalkBack user (or connected braille display) can run every
   core flow from the actions menu without any visual button:
-  *Start awareness · Pause awareness · Repeat last alert · Start OCR (read text) · Start scene
-  question · Start translation mode · Silence alerts · Open debug status.*
+  *Start awareness · Pause awareness · **Open voice commands** · Repeat last alert · Start OCR (read
+  text) · Start scene question · Start translation mode · Start/Repeat/Stop orientation · Silence
+  alerts · Open debug status.*
+- **Two-layer input, blind-first:** these native actions are **Layer A — the guaranteed path** for
+  TalkBack/braille users. Raw one-finger screen gestures (triple-tap voice, swipe-up translation,
+  swipe-down navigation) are **Layer B**, wired **only when TalkBack is off** (when it's on, the
+  screen reader owns one-finger gestures, so OBSERVA routes the user to Layer A and the hint line
+  reads *"Gestures available through TalkBack actions."*). Mapping is the unit-tested pure
+  `input/BlindGestureController`. See [`UX_INPUT_MAP.md`](UX_INPUT_MAP.md).
 - **Semantic state, not baked-in strings:** toggles use `stateDescription` ("on"/"off"); the status
   node carries `awarenessState` ("Awareness active" / "Awareness paused") and
   `detectorState` ("Detector backend: XNNPACK"). TalkBack announces state changes correctly and a

@@ -11,6 +11,8 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,11 +33,18 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -52,6 +61,9 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.observa.app.ObservaController
 import com.observa.app.hazard.FrameInput
+import com.observa.app.input.BlindGesture
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
 
@@ -64,6 +76,7 @@ private val Good = Color(0xFF69F0AE)
 @Composable
 fun ObservaScreen(controller: ObservaController) {
     LaunchedEffect(Unit) { controller.runProcessingLoop() }
+    TrackTalkBackState(controller)
 
     Column(
         modifier = Modifier
@@ -90,13 +103,95 @@ fun ObservaScreen(controller: ObservaController) {
 
         OperatingLayer(controller)
 
-        CameraPanel(controller, modifier = Modifier.fillMaxWidth().height(280.dp))
+        GestureHint(controller)
+
+        BlindGestureLayer(controller) {
+            CameraPanel(controller, modifier = Modifier.fillMaxWidth().height(280.dp))
+        }
 
         AlertBanner(controller.lastAlert)
         BrailleStatus(controller.brailleStatus)
         Dashboard(controller)
         Controls(controller)
     }
+}
+
+/**
+ * Keep the controller's TalkBack/touch-exploration flag fresh. Raw single-finger gestures are only a
+ * reliable channel when this is OFF; when ON, screen-reader users get the native custom actions.
+ */
+@Composable
+private fun TrackTalkBackState(controller: ObservaController) {
+    val context = LocalContext.current
+    DisposableEffect(Unit) {
+        val am = context.getSystemService(android.content.Context.ACCESSIBILITY_SERVICE)
+            as android.view.accessibility.AccessibilityManager
+        controller.updateTalkBackOn(am.isTouchExplorationEnabled)
+        val listener = android.view.accessibility.AccessibilityManager
+            .TouchExplorationStateChangeListener { enabled -> controller.updateTalkBackOn(enabled) }
+        am.addTouchExplorationStateChangeListener(listener)
+        onDispose { am.removeTouchExplorationStateChangeListener(listener) }
+    }
+}
+
+/**
+ * Honest gesture hint line. With TalkBack off it advertises the raw gestures; with TalkBack on it
+ * points users to the guaranteed native actions instead of unreliable one-finger gestures.
+ */
+@Composable
+private fun GestureHint(controller: ObservaController) {
+    Text(
+        text = controller.gestureStatusLine,
+        color = OnDark,
+        fontSize = 14.sp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("gestureHint")
+            .semantics { contentDescription = controller.gestureStatusLine },
+    )
+}
+
+/**
+ * Layer B: raw screen gestures, wired **only when TalkBack is off** (otherwise touch-exploration owns
+ * one-finger gestures, so we don't fight it). Triple tap → voice commands, double tap → repeat last,
+ * swipe up → translation, swipe down → orientation, long press → push-to-talk. All resolved by the
+ * pure [com.observa.app.input.BlindGestureController]; hazards still interrupt via the output router.
+ */
+@Composable
+private fun BlindGestureLayer(controller: ObservaController, content: @Composable () -> Unit) {
+    val active = controller.rawGesturesActive
+    val scope = rememberCoroutineScope()
+    val threshold = with(LocalDensity.current) { 48.dp.toPx() }
+    var tapCount by remember { mutableIntStateOf(0) }
+    var flush by remember { mutableStateOf<Job?>(null) }
+    var dragDy by remember { mutableStateOf(0f) }
+
+    val gestureModifier = if (active) {
+        Modifier
+            .pointerInput(active) {
+                detectTapGestures(
+                    onLongPress = { controller.onGesture(BlindGesture.LONG_PRESS) },
+                    onTap = {
+                        tapCount++
+                        flush?.cancel()
+                        flush = scope.launch {
+                            delay(320) // window to disambiguate single/double/triple tap
+                            controller.onTaps(tapCount)
+                            tapCount = 0
+                        }
+                    },
+                )
+            }
+            .pointerInput(active) {
+                detectVerticalDragGestures(
+                    onDragStart = { dragDy = 0f },
+                    onVerticalDrag = { _, dy -> dragDy += dy },
+                    onDragEnd = { controller.onVerticalSwipe(dragDy, threshold) },
+                )
+            }
+    } else Modifier
+
+    Box(modifier = gestureModifier) { content() }
 }
 
 /** A labeled, TalkBack-friendly on/off toggle row with a stable test tag. */
@@ -150,6 +245,7 @@ private fun OperatingLayer(controller: ObservaController) {
     val actions = listOf(
         CustomAccessibilityAction("Start awareness") { controller.observe(true); true },
         CustomAccessibilityAction("Pause awareness") { controller.observe(false); true },
+        CustomAccessibilityAction("Open voice commands") { controller.openVoiceCommands(); true },
         CustomAccessibilityAction("Repeat last alert") { controller.repeatLast(); true },
         CustomAccessibilityAction("Start OCR, read text") { controller.readText(); true },
         CustomAccessibilityAction("Start scene question") { controller.sceneQuestion(); true },

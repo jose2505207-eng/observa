@@ -7,7 +7,23 @@ Brutally-simple, eyes-free control. Full gesture detail: [`docs/HOTKEYS.md`](../
 Always-on Awareness · OCR (on demand) · Pause/Silence · Repeat Last · Navigation (guidance-first) ·
 Translation (on-demand shell, no model yet). Scene-question/VLM: not bundled.
 
-## Native accessibility actions (v2.2.0 — the guaranteed non-visual path)
+## Two-layer, blind-first input model
+
+OBSERVA uses **two layers** so that the guaranteed path never depends on a gesture the OS might
+intercept:
+
+- **Layer A — native accessibility actions (TalkBack/braille users):** the primary, guaranteed path.
+- **Layer B — raw screen gestures (only when TalkBack is OFF):** a convenience for sighted/low-vision
+  users not running a screen reader. When TalkBack/touch-exploration is on, one-finger gestures are
+  consumed by the screen reader, so OBSERVA **does not wire raw gestures** and routes the user to
+  Layer A instead.
+
+The pure mapping lives in `input/BlindGestureController.kt` (unit-tested); the Compose surface only
+detects raw events and asks the controller what to do. The live state is tracked via
+`AccessibilityManager.isTouchExplorationEnabled` (`TrackTalkBackState`), and the controller exposes
+`rawGesturesActive` / `gestureStatusLine`.
+
+### Layer A — native accessibility actions (the guaranteed non-visual path)
 
 The top of the screen is a **native operating layer**: three stable, focusable nodes (Current status,
 Last alert, Available actions). The Available-actions node carries Compose
@@ -17,16 +33,35 @@ displays). These do not depend on any custom gesture:
 | Action (TalkBack actions menu) | Effect |
 |---|---|
 | Start awareness / Pause awareness | `observe(true/false)` |
+| **Open voice commands** | `openVoiceCommands()` (hold-to-talk) |
 | Repeat last alert | `repeatLast()` |
 | Start OCR, read text | `readText()` |
 | Start scene question | `sceneQuestion()` (honest brightness summary) |
-| Start translation mode | honest "not installed" |
+| Start translation mode | honest readiness gate |
+| Start / Repeat / Stop orientation | GPS Orientation Lite |
 | Silence alerts | `silenceAlerts()` (hazards still fire) |
 | Open debug status | speaks detector backend + diagnostics |
 
 State is exposed via `stateDescription` (toggles "on"/"off") and semantic state lines
 ("Awareness active" / "Detector backend: XNNPACK"), so TalkBack and braille announce changes
-correctly. The three nodes are **not** live regions (read on demand, never flood braille).
+correctly. The three nodes are **not** live regions (read on demand, never flood braille). When
+TalkBack is on, the gesture-hint line reads **"Gestures available through TalkBack actions."**
+
+### Layer B — raw screen gestures (TalkBack OFF only)
+
+Detected on the main camera surface; resolved by `BlindGestureController`. Status line (TalkBack off):
+**"Triple tap for voice commands. Swipe up translation. Swipe down navigation. Double tap repeats."**
+
+| Gesture | Action |
+|---|---|
+| Triple tap | Open voice commands (hold-to-talk) |
+| Double tap | Repeat last alert |
+| Swipe up | Start translation mode (honest readiness) |
+| Swipe down | Start navigation / GPS Orientation Lite |
+| Long press | Push-to-talk |
+
+All actions are idempotent and emit at non-hazard priority, so a **vision hazard always interrupts**
+(the output router enforces `HAZARD > NAVIGATION > OCR > MODE > INFO`).
 
 ## Physical inputs
 

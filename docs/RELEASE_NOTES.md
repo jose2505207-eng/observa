@@ -4,6 +4,25 @@ Offline-first, privacy-first AI vision assistant for blind and low-vision users.
 `main` shippable: each builds, passes unit tests, has **no `INTERNET` permission**, and launches in
 airplane mode with camera preview intact.
 
+## Unreleased — NPU re-validation + blind-first two-layer gestures
+
+- **NPU re-audited from scratch (laptop-crash hypothesis ruled out).** Rebuilt the QNN host adaptor
+  (`make PyQnnManagerAdaptor` → built clean) and **re-exported** the QNN raw-head detector
+  (`--qnn-raw-head --imgsz 320` → all ops lower to HTP, valid 6.9 MB `qnn-htp SM8750/HTPv79` `.pte`).
+  Reinstalled and re-ran on the retail S25 Ultra: the `.pte` **loads/deserializes**, but HTP init
+  fails fresh at `Failed to load skel, error: 4000` / `device_handle … error=14001`. In the **same**
+  logcat the signed Samsung camera opens an unsigned PD on the cDSP and loads its HTP skel — so the
+  DSP works; it refuses the third-party app's protection domain. **Verdict: retail OS/DSP
+  protection-domain block, not a build artifact, not app code.** Detector runs **XNNPACK CPU
+  (~22–32 ms)** and says so. No INTERNET. Not tagged NPU-complete (NPU is not active on device).
+- **Blind-first two-layer input.** New pure, unit-tested `input/BlindGestureController`. **Layer A**
+  (guaranteed): native `CustomAccessibilityAction`s, now including **Open voice commands**. **Layer B**
+  (TalkBack OFF only): raw gestures on the camera surface — triple-tap → voice, swipe-up → translation,
+  swipe-down → orientation, double-tap → repeat, long-press → push-to-talk. `TrackTalkBackState`
+  watches `AccessibilityManager.isTouchExplorationEnabled`; when TalkBack is on, raw gestures are not
+  wired and the hint reads "Gestures available through TalkBack actions." Hazards still interrupt.
+  +5 unit tests (166-test suite). Build/tests green; **no INTERNET**.
+
 ## Unreleased — GPS Orientation Lite + Offline Translation readiness
 
 - **GPS Orientation Lite.** Real device GPS (`LocationManager`, no Play Services, **no INTERNET**) +

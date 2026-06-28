@@ -1,11 +1,23 @@
 ---
 status: current
 confidence: high
-last_updated: 2026-06-27
+last_updated: 2026-06-29
 owner: jose2505207-eng
 ---
 
 # ExecuTorch & Qualcomm QNN
+
+> **2026-06-29 re-audit (fresh, after a laptop crash-during-build scare):** the whole host/export
+> pipeline was rebuilt and re-run from scratch and the on-device test repeated. **Result: not a
+> laptop-build artifact.** Host pybind rebuilt clean (`make PyQnnManagerAdaptor` → `[100%] Built
+> target`); QNN raw-head **re-export passed** (all ops `| True`, valid 6.9 MB `qnn-htp SM8750/HTPv79`
+> `.pte` — byte-differs from the bundled one only due to QNN-compiler non-determinism, same 6,887,296
+> bytes); the bundled `.pte` **loads/deserializes on device**; HTP init still fails at the skel load
+> with a **fresh** `Failed to load skel, error: 4000` / `device_handle … error=14001`. Decisive new
+> proof: in the *same* logcat the signed Samsung camera process opens an **unsigned PD** on the cDSP
+> (`/vendor/dsp/cdsp/fastrpc_shell_unsigned_3`, `Created user PD on domain 7 … Unsigned:Y`) and loads
+> an HTP skel (`libbitml_nsp_79na_skel.so`) — so the DSP works; it refuses the **third-party app's**
+> protection domain. Conclusion unchanged: **retail OS/DSP protection-domain block, not our bug.**
 
 > On-device inference runtime and hardware acceleration. **Real end-to-end ExecuTorch inference is now demonstrated on device** (YOLOv8n, XNNPACK CPU delegate, ~32 ms median, Airplane Mode). QNN/NPU acceleration is documented and attemptable but **not yet shipped** (XNNPACK already meets the latency target).
 
