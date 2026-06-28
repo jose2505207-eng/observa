@@ -4,6 +4,25 @@ Newest entries first. Append an entry whenever you make a meaningful change to t
 
 ---
 
+## 2026-06-28 — v1.10.0 physical-button hotkeys + honest find-exit (v2 Part D)
+
+Branch `feature/v2-braille-hotkeys-accessibility`. Build + 122 unit tests pass; no `INTERNET`;
+device-verified on S25 Ultra (Volume Up ×3 → OCR fired end-to-end, no crash).
+
+- Foreground volume-rocker shortcuts (Layer 1), **off by default** so volume isn't hijacked.
+  Pure `HotkeySequencer` (counted presses, 1200 ms window, debounce, button-reset) +
+  `MainActivity.onKeyDown` (ACTION_DOWN only). Grammar: VolUp×1 repeat, ×2 status, ×3 read text,
+  ×4 find exit; VolDown×1 mute, ×2 stop nav, ×3 emergency pause (hazards still fire). Every command
+  confirmed by speech + Braille.
+- **Honest find-exit:** runs one real OCR pass; guides only if the camera actually reads "exit",
+  else "Exit not found. Try scanning slowly or use navigation." Never hallucinates an exit.
+- Accessible "Button shortcuts" toggle. Global Accessibility-Service hotkeys (Layer 2) **documented
+  as deferred** (privilege + unreliable Samsung volume capture) in `docs/HOTKEYS.md`.
+- Tests +6.
+
+**v2.0.0 gate still NOT met:** real detector model + offline map packs remain the blockers (see
+the v1.9.0 entry). Not tagging v2.0.0.
+
 ## 2026-06-28 — v1.9.0 progressive lock-on haptic navigation (v2 Part C)
 
 Branch `feature/v2-sensor-haptic-navigation`. Build + 116 unit tests pass; no `INTERNET`;

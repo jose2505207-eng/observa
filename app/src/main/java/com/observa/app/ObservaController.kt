@@ -13,6 +13,7 @@ import com.observa.app.accessibility.BrailleStatusPresenter
 import com.observa.app.accessibility.CueDirection
 import com.observa.app.accessibility.OutputEvent
 import com.observa.app.accessibility.OutputPriority
+import com.observa.app.hotkey.HotkeyCommand
 import com.observa.app.ocr.OcrEngine
 import com.observa.app.ocr.MlKitOcrEngine
 import com.observa.app.nav.DestinationStore
@@ -109,6 +110,7 @@ class ObservaController(context: Context) {
     var hapticCuesEnabled by mutableStateOf(true); private set
     var serviceStatus by mutableStateOf("normal rate"); private set
     var hapticMode by mutableStateOf(HapticGuidanceMode.NAVIGATION_LOCK_ON); private set
+    var hotkeysEnabled by mutableStateOf(false); private set
     val alerts = mutableStateListOf<String>()
 
     // --- Lock-on haptic guidance timing/state ---
@@ -220,9 +222,25 @@ class ObservaController(context: Context) {
      * Capture one camera frame and run offline OCR on demand. Declines honestly if OCR is not
      * available, says "No readable text found." when appropriate, and never runs continuously.
      */
-    fun readText() {
+    fun readText() = runOcr("Reading text…") { result -> emitOcr(result.message) }
+
+    /**
+     * Honest find-exit: runs one OCR pass and, only if the camera actually reads "exit", guides
+     * toward it. Never hallucinates an exit. (Door/exit-sign detection would require a real model;
+     * a mapped-exit path would require a map pack — both documented as future.)
+     */
+    fun findExit() = runOcr("Looking for an exit…") { result ->
+        val sawExit = result.found && result.text.contains("exit", ignoreCase = true)
+        emitOcr(
+            if (sawExit) "Exit text seen ahead. Scan slowly toward it."
+            else "Exit not found. Try scanning slowly or use navigation.",
+        )
+    }
+
+    /** Shared one-shot OCR capture used by Read Text and Find Exit. */
+    private fun runOcr(announce: String, onResult: (com.observa.app.ocr.OcrResult) -> Unit) {
         if (!ocr.ready) { respond("Text reading is unavailable."); return }
-        respond("Reading text…")
+        respond(announce)
         pendingOcrBitmap = null
         ocrCapturePending = true
         scope.launch {
@@ -231,7 +249,7 @@ class ObservaController(context: Context) {
             if (bmp == null) { respond("Could not capture an image."); return@launch }
             val result = withContext(Dispatchers.Default) { ocr.recognize(bmp) }
             bmp.recycle()
-            emitOcr(result.message)
+            onResult(result)
         }
     }
 
@@ -349,6 +367,36 @@ class ObservaController(context: Context) {
     }
 
     val hapticModeLabel: String get() = hapticMode.name.lowercase().replace('_', ' ')
+
+    // --- Physical-button hotkeys (foreground; off by default so volume isn't hijacked) ---
+
+    fun setHotkeys(value: Boolean) {
+        hotkeysEnabled = value
+        respond(if (value) "Button shortcuts on." else "Button shortcuts off.")
+    }
+
+    fun toggleHotkeys() = setHotkeys(!hotkeysEnabled)
+
+    /** Dispatch a resolved hotkey command. Confirmation is spoken + shown in Braille status. */
+    fun handleHotkey(cmd: HotkeyCommand) {
+        when (cmd) {
+            HotkeyCommand.REPEAT_LAST -> repeatLast()
+            HotkeyCommand.STATUS -> announceBrailleStatus()
+            HotkeyCommand.READ_TEXT -> { respond("Key: read text."); readText() }
+            HotkeyCommand.FIND_EXIT -> { respond("Key: find exit."); findExit() }
+            HotkeyCommand.MUTE_TOGGLE -> toggleMute()
+            HotkeyCommand.STOP_NAVIGATION -> stopNavigation()
+            HotkeyCommand.EMERGENCY_PAUSE -> emergencyPause()
+            HotkeyCommand.NONE -> {}
+        }
+    }
+
+    /** Pause non-hazard output. Hazards still fire (they bypass mute/pause for safety). */
+    fun emergencyPause() {
+        speaker.stop()
+        if (navSession.active) { navSession.stop(); navFixProvider.stop() }
+        respond("Non-hazard output paused. Hazards still active.")
+    }
 
     private fun currentBrailleLine(): String =
         BrailleStatusPresenter.format(BrailleSnapshot(observing, muted, executorch.status.label))

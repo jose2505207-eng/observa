@@ -350,6 +350,13 @@ private fun Controls(controller: ObservaController) {
         onChange = { controller.setHapticCues(it) },
     )
     Spacer(Modifier.height(8.dp))
+    ToggleRow(
+        label = "Button shortcuts",
+        checked = controller.hotkeysEnabled,
+        testTag = "hotkeysToggle",
+        onChange = { controller.setHotkeys(it) },
+    )
+    Spacer(Modifier.height(8.dp))
     Button(
         onClick = { controller.readText() },
         enabled = controller.ocrAvailable,

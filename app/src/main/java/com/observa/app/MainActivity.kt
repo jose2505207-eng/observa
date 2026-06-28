@@ -28,6 +28,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.observa.app.hotkey.HotkeyButton
+import com.observa.app.hotkey.HotkeySequencer
 import com.observa.app.service.AmbientAwarenessService
 import com.observa.app.service.ServiceBridge
 import com.observa.app.ui.ObservaScreen
@@ -36,6 +38,31 @@ import com.observa.app.ui.theme.OBSERVATheme
 class MainActivity : ComponentActivity() {
 
     private lateinit var controller: ObservaController
+    private val hotkeys = HotkeySequencer()
+    private val hotkeyHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var hotkeyFlush: Runnable? = null
+
+    /**
+     * Foreground volume-key shortcuts. Only active when the user enables "Button shortcuts"; only
+     * ACTION_DOWN is consumed; otherwise volume keys behave normally (not hijacked). Presses are
+     * counted in a rolling window and resolved by [HotkeySequencer].
+     */
+    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent): Boolean {
+        if (!controller.hotkeysEnabled) return super.onKeyDown(keyCode, event)
+        val button = when (keyCode) {
+            android.view.KeyEvent.KEYCODE_VOLUME_UP -> HotkeyButton.VOLUME_UP
+            android.view.KeyEvent.KEYCODE_VOLUME_DOWN -> HotkeyButton.VOLUME_DOWN
+            else -> return super.onKeyDown(keyCode, event)
+        }
+        if (event.repeatCount == 0) {
+            hotkeys.onPress(button, android.os.SystemClock.elapsedRealtime())
+            hotkeyFlush?.let { hotkeyHandler.removeCallbacks(it) }
+            val flush = Runnable { controller.handleHotkey(hotkeys.flush()) }
+            hotkeyFlush = flush
+            hotkeyHandler.postDelayed(flush, 1_200L)
+        }
+        return true // consume so the system volume UI doesn't fire while shortcuts are on
+    }
 
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
