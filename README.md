@@ -12,13 +12,24 @@ Existing AI vision apps assume the user can already aim a camera at what matters
 
 Android-native, low-latency, battery-conscious, on-device inference (ExecuTorch).
 
-## Current status
+## Current status (v1.7)
 
-**Working today (verified on a physical device in Airplane Mode):** a single-screen Jetpack Compose app with an always-on CameraX loop (~30 FPS), an on-device **brightness heuristic** detector, a **hazard engine** with cooldown + scene memory (no spam), **spoken (TTS)** and **haptic** alerts, a deterministic **Demo Mode**, and an accessible high-contrast dashboard (camera/frames/FPS/backend/cooldown/privacy) with TalkBack labels.
+**Working today, verified on a Galaxy S25 Ultra in Airplane Mode:**
+- Always-on CameraX loop (~25–32 FPS) with an on-device **brightness heuristic** detector + **hazard engine** (cooldown, scene memory, no spam).
+- **Unified output**: TTS speech, **directional audio cues** (stereo-panned), **directional haptics**, and a **Braille/TalkBack live-region** status — one router, priority `HAZARD > NAVIGATION > OCR > MODE > INFO` (hazards interrupt; cues survive mute).
+- **On-demand OCR** (ML Kit bundled Latin model, fully offline) — "Read Text" reads signs aloud.
+- **Offline voice commands** (on-device recognizer): observing on/off, describe scene, what is ahead, read text, braille on/off/status, navigate to, stop navigation, where am I, repeat, mute/unmute, help.
+- **Foreground service** with a persistent honest notification ("running offline") + accessible Stop/Mute/Repeat, and an **adaptive battery/thermal duty cycle**.
+- **Offline guidance-first navigation**: clock-face, heading-relative guidance (real compass) to saved destinations, with honest GPS/compass uncertainty.
+- **No `INTERNET` permission** — the app physically cannot use the network (verified `aapt2`/`dumpsys`).
 
-**Truthfully not done:** real ExecuTorch inference, QNN/NPU acceleration, OCR, and voice input. The UI says so — it shows `ExecuTorch: bundled, not invoked` and labels Demo Mode and the heuristic as such. A `VisionRuntime` abstraction is ready for a real inference path to drop in.
+**Honestly NOT done (no faking):**
+- Real ML **object recognition** — the ExecuTorch + YOLO path is implemented and unit-tested, but **no `observa_detector.pte` is bundled** (toolchain/license/version blockers; reproducible export in [`scripts/export_detector.py`](scripts/export_detector.py)). The live detector is the brightness heuristic; the UI says `AI model: unavailable — heuristic fallback`.
+- **QNN acceleration** — the delegate library is detected but **not active** (no QNN-lowered model); never claimed active unless `MethodMetadata.getBackends()` proves it.
+- **Live GPS** navigation (uses a documented demo location + real compass) and **map packs**.
+- **Physical Braille display** verified (app-level live-region exposed; no hardware tested) and a full **human sensory pass**.
 
-Full honesty ledger: [`docs/current-status.md`](docs/current-status.md). Demo steps: [`docs/demo-script.md`](docs/demo-script.md). Plan: [`docs/implementation-plan.md`](docs/implementation-plan.md).
+Demo: [`docs/FINAL_DEMO.md`](docs/FINAL_DEMO.md) · Limitations: [`docs/KNOWN_LIMITATIONS.md`](docs/KNOWN_LIMITATIONS.md) · Privacy: [`docs/PRIVACY_MODEL.md`](docs/PRIVACY_MODEL.md) · Performance: [`docs/PERFORMANCE_METRICS.md`](docs/PERFORMANCE_METRICS.md) · Accessibility: [`docs/ACCESSIBILITY_VALIDATION.md`](docs/ACCESSIBILITY_VALIDATION.md) · Release notes: [`docs/RELEASE_NOTES.md`](docs/RELEASE_NOTES.md).
 
 ## The wiki is the project memory
 

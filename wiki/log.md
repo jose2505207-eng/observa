@@ -4,6 +4,21 @@ Newest entries first. Append an entry whenever you make a meaningful change to t
 
 ---
 
+## 2026-06-28 — v1.8.0 production demo & release readiness
+
+Branch `feature/v1.8-final-production-demo`. Docs-only; build + 106 unit tests pass; no `INTERNET`.
+
+- Rewrote README "Current status" to honest v1.7 reality (was stale at the v0 baseline).
+- Added release/demo docs: `docs/FINAL_DEMO.md` (14-step offline script, real-vs-fallback called
+  out), `docs/RELEASE_CHECKLIST.md`, `docs/KNOWN_LIMITATIONS.md`, `docs/PRIVACY_MODEL.md`,
+  `docs/PERFORMANCE_METRICS.md` (measured vs not-measured-with-reason),
+  `docs/ACCESSIBILITY_VALIDATION.md` + validation matrix, `docs/RELEASE_NOTES.md` (v1.4→v1.8).
+- Honesty pass: no fake object recognition, no "QNN active" without `getBackends()` proof, no
+  physical-Braille claim, no GPS precision claim — all gaps explicit.
+
+**Repo state:** v1.6 (foreground service) and v1.7 (offline navigation) merged + tagged; v1.5
+detector code merged but model artifact still unbundled (blocked); QNN never active.
+
 ## 2026-06-28 — v1.7.0 offline navigation (guidance-first)
 
 Branch `feature/v1.7-offline-navigation`. Build + 106 unit tests pass; no `INTERNET` and no
