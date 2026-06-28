@@ -4,6 +4,31 @@ Newest entries first. Append an entry whenever you make a meaningful change to t
 
 ---
 
+## 2026-06-27 — v2.2.0 native TalkBack + braille operating layer
+
+App build + unit tests green (incl. 10 new reducer tests); no `INTERNET`; XNNPACK detector path and
+hazard priority untouched.
+
+- **Native operating layer.** Three stable, focusable accessible nodes — Current status, Last alert,
+  Available actions — at the top of `ObservaScreen`. The Available-actions node carries Compose
+  `CustomAccessibilityAction`s so every core flow is operable from TalkBack's actions menu (and via
+  braille displays) without any visual button: start/pause awareness, repeat last alert, OCR, scene
+  question, translation mode, silence alerts, open debug status.
+- **Pure reducer** `AccessibilityStatusReducer` (+ `A11yState`, `DetectorBackend`) derives all node
+  texts and `stateDescription` semantics; `stripDebug` guarantees confidence/bbox/latency never reach
+  user output. Unit-tested (`AccessibilityStatusReducerTest`, 10 cases).
+- **Semantic state.** Toggles now use `stateDescription` ("on"/"off"); status node carries
+  "Awareness active/paused" and "Detector backend: XNNPACK". Operating-layer nodes are NOT live
+  regions → no braille flooding; the assertive hazard banner + polite status line remain the push channels.
+- **Honesty held.** Translation action says "not installed" (no model, never cloud); scene question is
+  the labeled brightness summary; detector backend comes from real `InferenceStatus`.
+- **Controller** gained `detectorBackend`, `translationInstalled`, `sceneQuestion()`,
+  `startTranslation()`, `silenceAlerts()`, `announceDebugStatus()`, and reducer-backed node getters.
+- Docs: `BRAILLE_ACCESSIBILITY.md` (gap closed), `UX_INPUT_MAP.md` (custom-actions + honest gesture
+  table), new `docs/demo/ACCESSIBILITY_DEMO.md` (manual validation), README. Not tagged.
+
+---
+
 ## 2026-06-27 — v2.1.0 QNN host AOT unblocked (real root cause + fix); YOLOv8n graph still blocks
 
 Disciplined QNN/NPU unblock loop. App build + unit tests still green; no `INTERNET`; XNNPACK remains

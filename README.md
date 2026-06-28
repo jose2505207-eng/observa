@@ -18,6 +18,7 @@ Android-native, low-latency, battery-conscious, on-device inference (ExecuTorch)
 - **Real on-device ML object detection** — YOLOv8n (COCO-80) exported to **ExecuTorch** (320×320, **XNNPACK** CPU delegate), bundled as `assets/models/observa_detector.pte` and run locally. Measured **median ~32 ms inference (p95 ~58 ms)**, under the 100 ms danger-recognition target; `forward backends=[XnnpackBackend]`. Person/vehicle/large-obstacle detections drive the hazard engine. (Brightness heuristic remains only as a no-model fallback.)
 - Always-on CameraX loop (~25–32 FPS) + **hazard engine** (cooldown, scene memory, no spam).
 - **Unified output**: TTS speech, **directional audio cues** (stereo-panned), **directional haptics**, and a **Braille/TalkBack live-region** status — one router, priority `HAZARD > NAVIGATION > OCR > MODE > INFO` (hazards interrupt; cues survive mute).
+- **Native accessibility operating layer**: stable **Current status / Last alert / Available actions** accessible nodes plus TalkBack/braille **custom actions** (start/pause awareness, repeat, OCR, scene question, translation, silence, debug) — the app is fully operable without visual buttons, with `stateDescription` semantics and no braille flooding.
 - **On-demand OCR** (ML Kit bundled Latin model, fully offline) — "Read Text" reads signs aloud.
 - **Offline voice commands** (on-device recognizer): observing on/off, describe scene, what is ahead, read text, braille on/off/status, navigate to, stop navigation, where am I, repeat, mute/unmute, help.
 - **Foreground service** with a persistent honest notification ("running offline") + accessible Stop/Mute/Repeat, and an **adaptive battery/thermal duty cycle**.
@@ -31,7 +32,7 @@ Android-native, low-latency, battery-conscious, on-device inference (ExecuTorch)
 - **Live GPS** navigation (uses a documented demo location + real compass) and **map packs**.
 - **Physical Braille display** verified (app-level live-region exposed; no hardware tested) and a full **human sensory pass**.
 
-Demo: [`docs/FINAL_DEMO.md`](docs/FINAL_DEMO.md) · Limitations: [`docs/KNOWN_LIMITATIONS.md`](docs/KNOWN_LIMITATIONS.md) · Privacy: [`docs/PRIVACY_MODEL.md`](docs/PRIVACY_MODEL.md) · Performance: [`docs/PERFORMANCE_METRICS.md`](docs/PERFORMANCE_METRICS.md) · Accessibility: [`docs/ACCESSIBILITY_VALIDATION.md`](docs/ACCESSIBILITY_VALIDATION.md) · Release notes: [`docs/RELEASE_NOTES.md`](docs/RELEASE_NOTES.md).
+Demo: [`docs/FINAL_DEMO.md`](docs/FINAL_DEMO.md) · Limitations: [`docs/KNOWN_LIMITATIONS.md`](docs/KNOWN_LIMITATIONS.md) · Privacy: [`docs/PRIVACY_MODEL.md`](docs/PRIVACY_MODEL.md) · Performance: [`docs/PERFORMANCE_METRICS.md`](docs/PERFORMANCE_METRICS.md) · Accessibility: [`docs/ACCESSIBILITY_VALIDATION.md`](docs/ACCESSIBILITY_VALIDATION.md), [`docs/demo/ACCESSIBILITY_DEMO.md`](docs/demo/ACCESSIBILITY_DEMO.md) · Release notes: [`docs/RELEASE_NOTES.md`](docs/RELEASE_NOTES.md).
 
 ## The wiki is the project memory
 

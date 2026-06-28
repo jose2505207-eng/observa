@@ -4,6 +4,22 @@ Offline-first, privacy-first AI vision assistant for blind and low-vision users.
 `main` shippable: each builds, passes unit tests, has **no `INTERNET` permission**, and launches in
 airplane mode with camera preview intact.
 
+## v2.2.0 — native TalkBack + braille operating layer (not yet tagged)
+- **Operable without visual buttons.** New native operating layer: stable **Current status**, **Last
+  alert**, **Available actions** accessible nodes, with TalkBack/braille **custom actions** for every
+  core flow (start/pause awareness, repeat last alert, OCR, scene question, translation mode, silence
+  alerts, open debug status). Four redundant non-visual paths: custom actions, voice, volume hotkeys,
+  labeled controls.
+- **Semantic state + no braille flooding.** `stateDescription` on toggles; "Awareness active" /
+  "Detector backend: XNNPACK" semantics; operating-layer nodes are not live regions (read on demand).
+  Hazard alerts stay highest priority (assertive). `AccessibilityStatusReducer.stripDebug` keeps
+  confidence/bbox/latency out of user output.
+- **Honest.** Translation = "not installed" (no model, never cloud); scene question = labeled
+  brightness summary; backend from real `InferenceStatus`. Pure `AccessibilityStatusReducer` with 10
+  unit tests. No `INTERNET`. XNNPACK detector path unchanged. Docs:
+  `implementation/BRAILLE_ACCESSIBILITY.md`, `implementation/UX_INPUT_MAP.md`,
+  `demo/ACCESSIBILITY_DEMO.md`.
+
 ## v2.1.0 — QNN host AOT unblocked (real fix); YOLOv8n graph still blocks
 - **Solved the v2.0.0 QNN host blocker.** `QnnManager.InitBackend()` (`Failed to initialize QNN
   backend for kHtpBackend`) was an **ABI mismatch** between the prebuilt ExecuTorch 1.3.1 wheel's QNN

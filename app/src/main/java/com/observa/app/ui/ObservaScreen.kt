@@ -38,10 +38,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -84,6 +88,8 @@ fun ObservaScreen(controller: ObservaController) {
             modifier = Modifier.semantics { contentDescription = "Privacy: ${controller.privacyLabel}" },
         )
 
+        OperatingLayer(controller)
+
         CameraPanel(controller, modifier = Modifier.fillMaxWidth().height(280.dp))
 
         AlertBanner(controller.lastAlert)
@@ -103,7 +109,8 @@ private fun ToggleRow(label: String, checked: Boolean, testTag: String, onChange
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .testTag(testTag)
             .semantics(mergeDescendants = true) {
-                contentDescription = "$label ${if (checked) "on" else "off"}. Double tap to toggle."
+                contentDescription = label
+                stateDescription = if (checked) "on" else "off"
             },
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
@@ -128,6 +135,77 @@ private fun BrailleStatus(status: String) {
             },
     ) {
         Text(text = status, color = Good, fontSize = 16.sp)
+    }
+}
+
+/**
+ * Native accessibility operating layer. Three stable, focusable nodes (Current status, Last alert,
+ * Available actions) plus TalkBack/braille **custom actions** so every core flow is operable without
+ * relying on the visual buttons below. These nodes are NOT live regions — they update silently and
+ * are read on demand, so a refreshable braille display is not flooded. The hazard banner (assertive
+ * live region) and braille status (polite live region) remain the push channels.
+ */
+@Composable
+private fun OperatingLayer(controller: ObservaController) {
+    val actions = listOf(
+        CustomAccessibilityAction("Start awareness") { controller.observe(true); true },
+        CustomAccessibilityAction("Pause awareness") { controller.observe(false); true },
+        CustomAccessibilityAction("Repeat last alert") { controller.repeatLast(); true },
+        CustomAccessibilityAction("Start OCR, read text") { controller.readText(); true },
+        CustomAccessibilityAction("Start scene question") { controller.sceneQuestion(); true },
+        CustomAccessibilityAction("Start translation mode") { controller.startTranslation(); true },
+        CustomAccessibilityAction("Silence alerts") { controller.silenceAlerts(); true },
+        CustomAccessibilityAction("Open debug status") { controller.announceDebugStatus(); true },
+    )
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Panel, RoundedCornerShape(12.dp))
+            .padding(16.dp)
+            .testTag("operatingLayer"),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        // Current status — focusable heading; carries semantic awareness state.
+        Text(
+            text = controller.a11yCurrentStatus,
+            color = Good,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("statusNode")
+                .semantics(mergeDescendants = true) {
+                    heading()
+                    contentDescription = "Current status"
+                    stateDescription = controller.a11yCurrentStatus
+                },
+        )
+        // Last alert — stable, read on demand (the assertive banner handles push).
+        Text(
+            text = controller.a11yLastAlertNode,
+            color = Accent,
+            fontSize = 16.sp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("lastAlertNode")
+                .semantics(mergeDescendants = true) {
+                    contentDescription = controller.a11yLastAlertNode
+                },
+        )
+        // Available actions — the operating hub. Carries the custom accessibility actions so a
+        // TalkBack user (or braille display) can run any core flow from the actions menu.
+        Text(
+            text = controller.a11yActionsNode,
+            color = OnDark,
+            fontSize = 14.sp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("actionsNode")
+                .semantics(mergeDescendants = true) {
+                    contentDescription = controller.a11yActionsNode
+                    customActions = actions
+                },
+        )
     }
 }
 
@@ -305,10 +383,8 @@ private fun Controls(controller: ObservaController) {
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .testTag("observingToggle")
             .semantics(mergeDescendants = true) {
-                contentDescription = if (controller.observing)
-                    "Observing on. Double tap to stop observing."
-                else
-                    "Observing off. Double tap to start observing."
+                contentDescription = "Observing, awareness"
+                stateDescription = if (controller.observing) "on" else "off"
             },
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
@@ -324,10 +400,8 @@ private fun Controls(controller: ObservaController) {
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .testTag("brailleToggle")
             .semantics(mergeDescendants = true) {
-                contentDescription = if (controller.brailleEnabled)
-                    "Braille status on. Double tap to turn off."
-                else
-                    "Braille status off. Double tap to turn on."
+                contentDescription = "Braille status"
+                stateDescription = if (controller.brailleEnabled) "on" else "off"
             },
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,

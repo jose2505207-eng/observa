@@ -7,10 +7,13 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import android.graphics.Bitmap
+import com.observa.app.accessibility.A11yState
 import com.observa.app.accessibility.AccessibilityOutputRouter
+import com.observa.app.accessibility.AccessibilityStatusReducer
 import com.observa.app.accessibility.BrailleSnapshot
 import com.observa.app.accessibility.BrailleStatusPresenter
 import com.observa.app.accessibility.CueDirection
+import com.observa.app.accessibility.DetectorBackend
 import com.observa.app.accessibility.OutputEvent
 import com.observa.app.accessibility.OutputPriority
 import com.observa.app.hotkey.HotkeyCommand
@@ -217,6 +220,50 @@ class ObservaController(context: Context) {
 
     /** Speak + show the current concise Braille status line (the "braille status" command). */
     fun announceBrailleStatus() = respond(currentBrailleLine())
+
+    // --- Native accessibility operating layer (TalkBack custom actions / stable nodes) ---
+
+    /** Whether an on-device translation model is bundled. Honestly false (mode is a shell). */
+    val translationInstalled: Boolean = false
+
+    /** Short detector backend, mapped truthfully from the real inference status. */
+    val detectorBackend: DetectorBackend
+        get() = when (executorch.status) {
+            InferenceStatus.LOADED_QNN -> DetectorBackend.QNN
+            InferenceStatus.LOADED_CPU -> DetectorBackend.XNNPACK
+            else -> DetectorBackend.HEURISTIC
+        }
+
+    private fun a11ySnapshot() = A11yState(
+        awarenessActive = observing,
+        muted = muted,
+        detector = detectorBackend,
+        ocrReady = ocr.ready,
+        translationInstalled = translationInstalled,
+        navigating = navSession.active,
+        lastAlert = if (lastAlert == "No alerts yet") null else lastAlert,
+    )
+
+    /** Stable accessible node texts for the operating layer (derived by the pure reducer). */
+    val a11yCurrentStatus: String get() = AccessibilityStatusReducer.currentStatus(a11ySnapshot())
+    val a11yLastAlertNode: String get() = AccessibilityStatusReducer.lastAlert(a11ySnapshot())
+    val a11yActionsNode: String get() = AccessibilityStatusReducer.availableActions(a11ySnapshot())
+    val awarenessStateDesc: String get() = AccessibilityStatusReducer.awarenessState(a11ySnapshot())
+    val detectorStateDesc: String get() = AccessibilityStatusReducer.detectorState(a11ySnapshot())
+
+    /** Honest scene question: a brightness-based summary (no scene VLM bundled yet — says so). */
+    fun sceneQuestion() = describeScene()
+
+    /** Translation mode action — honestly reports that no on-device model is installed. */
+    fun startTranslation() = respond(
+        "Translation mode is not installed. No on-device translation model is bundled yet, and OBSERVA never uses the cloud.",
+    )
+
+    /** Silence non-hazard output. Hazards still fire (safety). Same path as the emergency pause. */
+    fun silenceAlerts() = emergencyPause()
+
+    /** Speak the engineering/debug detector status (kept out of normal alert output). */
+    fun announceDebugStatus() = respond("${detectorStateDesc}. ${aiDiagnostics}")
 
     /**
      * Capture one camera frame and run offline OCR on demand. Declines honestly if OCR is not
