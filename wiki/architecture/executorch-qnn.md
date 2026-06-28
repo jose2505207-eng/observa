@@ -19,6 +19,24 @@ owner: jose2505207-eng
 > an HTP skel (`libbitml_nsp_79na_skel.so`) — so the DSP works; it refuses the **third-party app's**
 > protection domain. Conclusion unchanged: **retail OS/DSP protection-domain block, not our bug.**
 
+> **2026-06-29 deep reverse-engineering pass** (branch `npu-root-cause-reverse-engineering`; full
+> experiment matrix in [`docs/implementation/QNN_REVERSE_ENGINEERING_LOG.md`](../../docs/implementation/QNN_REVERSE_ENGINEERING_LOG.md)).
+> Four new facts nail the root cause:
+> 1. **ABI correct** — `libQnnHtpV79Skel.so` is `ELF 32-bit QUALCOMM DSP6` (right arch for the cDSP).
+> 2. **Model-independent** — **Experiment F**: a tiny 2-op `Conv2d→ReLU` QNN `.pte` (67 KB) fails at the
+>    *identical* first line as YOLO (`loadRemoteSymbols failed err 4000` → `device_handle 14001`). Not
+>    the model/export/parser — it is HTP **device-handle creation**, before any graph runs.
+> 3. **Only PD mode we can request is already used** — ExecuTorch QNN defaults to **`kHtpUnsignedPd`**;
+>    the retail device still refuses it. Signed PD needs an OEM/Qualcomm signature we don't have.
+> 4. **Device posture** — `SM-S938U1`, verified-boot green, bootloader locked, `ro.debuggable=0`,
+>    SELinux enforcing; app domain **`untrusted_app`**; no app-attributed AVC (refusal is DSP-side AEE
+>    err 4000) while the signed camera HAL uses the same cDSP.
+>
+> **Verdict: Outcome B — NPU unreachable from a normal sideloaded app on this retail unit.** External
+> dependency (any one): signed PD / OEM allowlist, platform-signed privileged app, engineering/
+> `userdebug` firmware, Qualcomm AI Hub deployment, or a device whose policy permits third-party
+> unsigned-PD HTP.
+
 > On-device inference runtime and hardware acceleration. **Real end-to-end ExecuTorch inference is now demonstrated on device** (YOLOv8n, XNNPACK CPU delegate, ~32 ms median, Airplane Mode). QNN/NPU acceleration is documented and attemptable but **not yet shipped** (XNNPACK already meets the latency target).
 
 ## Current Reality (verified on Galaxy S25 Ultra · SM8750)

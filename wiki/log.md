@@ -4,6 +4,31 @@ Newest entries first. Append an entry whenever you make a meaningful change to t
 
 ---
 
+## 2026-06-29 — QNN/NPU deep reverse-engineering → Outcome B (retail PD block), + stage instrumentation
+
+Branch `npu-root-cause-reverse-engineering`. Reverse-engineered the skel-4000 failure end to end
+(10-loop log: `docs/implementation/QNN_REVERSE_ENGINEERING_LOG.md`). **No working NPU path on this
+retail unit; proven model-independent and device-side.**
+
+- **ABI:** `libQnnHtpV79Skel.so` = ELF 32-bit QUALCOMM DSP6 (correct). Host libs AArch64. No mismatch.
+- **Experiment F (decisive):** a tiny 2-op Conv2d→ReLU QNN `.pte` (67 KB) fails at the *identical* line
+  as YOLO — `loadRemoteSymbols failed err 4000` / `device_handle 14001`. Failure is at HTP device-handle
+  creation, before any graph → **not the model/export/parser**.
+- **PD:** ExecuTorch QNN already defaults to `kHtpUnsignedPd` (the only mode a non-OEM app can ask for);
+  device still refuses it. Signed PD needs an OEM signature.
+- **Device:** SM-S938U1, verified-boot green, bootloader locked, `ro.debuggable=0`, SELinux enforcing;
+  app domain `untrusted_app`; cDSP nodes are vendor-owned; no app AVC (DSP-side AEE err 4000), while the
+  signed camera HAL uses the same cDSP.
+- **Instrumentation:** new `qnnStage` (libs → model loaded → backend init/warm-up failed → active) in
+  `ExecuTorchDetector` + `qnnStageLine` in the debug status. `LOADED_QNN` only on a real warm-up forward.
+- **Outcome B.** External dependency to ever reach NPU: signed PD / OEM allowlist, platform-signed
+  privileged app, engineering/userdebug firmware, Qualcomm AI Hub deployment, or a permissive device.
+- Detector stays XNNPACK CPU (~22–32 ms). Build + 166 tests green; no INTERNET; accessibility untouched.
+  **Not tagged v2.2.0** (NPU not active). Device dropped off USB during the final cosmetic re-install;
+  all decisive measurements were captured while connected.
+
+---
+
 ## 2026-06-29 — NPU re-audit (laptop-crash ruled out) + blind-first two-layer gestures
 
 User feared the laptop crash-during-build broke the NPU. Re-audited the whole QNN pipeline from

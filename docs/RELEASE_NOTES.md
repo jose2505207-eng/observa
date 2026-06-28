@@ -4,6 +4,23 @@ Offline-first, privacy-first AI vision assistant for blind and low-vision users.
 `main` shippable: each builds, passes unit tests, has **no `INTERNET` permission**, and launches in
 airplane mode with camera preview intact.
 
+## Unreleased — QNN/NPU reverse-engineering (Outcome B) + stage instrumentation
+
+- **Reverse-engineered the skel-4000 failure end to end** (branch `npu-root-cause-reverse-engineering`;
+  full matrix in `docs/implementation/QNN_REVERSE_ENGINEERING_LOG.md`). Proven **model-independent and
+  device-side**: a tiny 2-op Conv2d→ReLU QNN `.pte` (67 KB) fails at the *identical* first line as YOLO
+  (`loadRemoteSymbols err 4000` → `device_handle 14001`), i.e. at HTP device-handle creation before any
+  graph runs. ABI verified correct (DSP6 skel). ExecuTorch QNN already uses the only PD mode a non-OEM
+  app can request (`kHtpUnsignedPd`) and the device still refuses it. Device is locked retail
+  (`SM-S938U1`, verified-boot green, bootloader locked, `ro.debuggable=0`, SELinux enforcing); app runs
+  as `untrusted_app`; the signed camera HAL uses the same cDSP. **Verdict: NPU unreachable from a normal
+  sideloaded app — needs signed PD/OEM allowlist, privileged/platform-signed app, engineering/userdebug
+  firmware, Qualcomm AI Hub deployment, or a permissive device.**
+- **Honest instrumentation:** new `QNN stage:` line in the debug status (libs → model loaded → backend
+  init / warm-up failed → active). `LOADED_QNN` still set only after a real QNN warm-up `forward`.
+- Detector stays **XNNPACK CPU (~22–32 ms)**. Build + 166 tests green; **no INTERNET**; accessibility
+  untouched. **Not tagged v2.2.0** (NPU not active on device).
+
 ## Unreleased — NPU re-validation + blind-first two-layer gestures
 
 - **NPU re-audited from scratch (laptop-crash hypothesis ruled out).** Rebuilt the QNN host adaptor

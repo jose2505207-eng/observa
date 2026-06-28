@@ -391,8 +391,11 @@ class ObservaController(context: Context) {
             DetectorBackend.HEURISTIC -> "Detector backend: heuristic fallback (no model)"
         }
 
+    /** QNN/NPU pipeline stage, for the debug surface. "active" only after a real warm-up forward. */
+    val qnnStageLine: String get() = "QNN stage: ${executorch.qnnStage}"
+
     /** Speak the engineering/debug detector status (kept out of normal alert output). */
-    fun announceDebugStatus() = respond("$backendStatusLine. ${aiDiagnostics}")
+    fun announceDebugStatus() = respond("$backendStatusLine. $qnnStageLine. ${aiDiagnostics}")
 
     /**
      * Capture one camera frame and run offline OCR on demand. Declines honestly if OCR is not

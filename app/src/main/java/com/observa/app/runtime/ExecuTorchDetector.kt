@@ -45,6 +45,12 @@ class ExecuTorchDetector(
     var detail: String = "not initialized"; private set
     /** Exact reason the QNN/NPU path was not used (empty if QNN is active). For debug status. */
     var qnnError: String = ""; private set
+    /**
+     * How far the QNN/NPU path got, for the debug status. One of: "not started", "libs present" /
+     * "libs missing", "model loaded", "no QNN backend", "backend init / warm-up failed", "active".
+     * Never reports "active" unless a real warm-up `forward` ran on the QNN backend.
+     */
+    var qnnStage: String = "not started"; private set
 
     // --- Diagnostics (read by the UI/Braille diagnostics surface) ---
     var modelBytes: Long = 0L; private set
@@ -68,6 +74,7 @@ class ExecuTorchDetector(
 
     override fun initialize(context: Context): InferenceStatus {
         qnn = QnnRuntimeChecker.check(context)
+        qnnStage = if (qnn == QnnStatus.NOT_PRESENT) "libs missing" else "libs present"
         // Point the Hexagon DSP (cDSP) at our extracted skel so QNN HTP can load libQnnHtpV79Skel.so.
         // Without this the device reports "Failed to load skel, error 4000" and HTP init fails.
         runCatching {
@@ -94,11 +101,13 @@ class ExecuTorchDetector(
                 val t0 = SystemClock.elapsedRealtime()
                 val m = Module.load(path)
                 val ms = SystemClock.elapsedRealtime() - t0
+                if (cand.requireQnn) qnnStage = "model loaded"
                 val backendList = runCatching { m.getMethodMetadata("forward").backends.joinToString() }
                     .getOrDefault("")
                 val usesQnn = backendList.contains("qnn", ignoreCase = true)
                 if (cand.requireQnn && !usesQnn) {
                     m.close()
+                    qnnStage = "no QNN backend"
                     qnnError = "model loaded but no QNN backend (backends=[$backendList])"
                     Log.w(TAG, "QNN candidate rejected: $qnnError → trying next")
                     continue
@@ -106,6 +115,7 @@ class ExecuTorchDetector(
                 // Warm-up forward: proves the backend actually executes on this device. If the QNN/HTP
                 // runtime libs are missing or HTP fails to init, this throws and we fall back honestly.
                 warmUp(m)
+                if (cand.requireQnn) qnnStage = "active"
 
                 module = m
                 parser = cand.parser
@@ -126,6 +136,7 @@ class ExecuTorchDetector(
             } catch (e: Throwable) {
                 module = null
                 if (cand.requireQnn) {
+                    qnnStage = "backend init / warm-up failed"
                     qnnError = e.message ?: e.toString()
                     Log.e(TAG, "QNN candidate failed to load/warm-up → falling back to XNNPACK", e)
                     continue

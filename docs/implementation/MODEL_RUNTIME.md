@@ -189,6 +189,28 @@ the same instant. The block is the **retail S25 Ultra's DSP/protection-domain po
 crash, not the export, not the app. NPU would light up automatically on a signed/privileged/`userdebug`
 build or an OEM-allowlisted device, because `LOADED_QNN` is set only on a real QNN warm-up `forward`.
 
+### 2026-06-29 deep reverse-engineering (full matrix → Outcome B)
+
+See [`QNN_REVERSE_ENGINEERING_LOG.md`](QNN_REVERSE_ENGINEERING_LOG.md) for the loop-by-loop log. Net new
+findings that pin the root cause beyond doubt:
+
+- **ABI verified:** `libQnnHtpV79Skel.so` is `ELF 32-bit QUALCOMM DSP6` (correct cDSP arch); host libs
+  AArch64; no mismatch, no missing NEEDED, no version mixing.
+- **Experiment F (decisive):** a tiny 2-op `Conv2d→ReLU` QNN `.pte` (67 KB) fails at the **identical**
+  first line as YOLO — `loadRemoteSymbols failed err 4000` → `device_handle … 14001`. The failure is at
+  HTP **device-handle creation**, *before* any graph runs → **model-independent**. Not the YOLO model,
+  not the export, not the parser.
+- **PD mode:** ExecuTorch QNN already defaults to **`kHtpUnsignedPd`** — the only PD mode a non-OEM app
+  can request — and the retail device still refuses it (err 4000). Signed PD needs an OEM signature.
+- **Device/SELinux:** `SM-S938U1`, verified-boot green, bootloader locked, `ro.debuggable=0`, SELinux
+  enforcing; app domain `untrusted_app`; cDSP fastRPC nodes are `vendor_qdsp_device`/`vendor_xdsp_device`
+  (system-owned). No app-attributed AVC — the refusal is DSP-side (AEE err 4000), while the signed
+  camera HAL uses the same cDSP. New debug surface: `QNN stage:` (… → model loaded → backend init /
+  warm-up failed), never "active" without a real warm-up `forward`.
+- **External dependency for Outcome A (any one):** signed PD / OEM allowlist; platform-signed privileged
+  app; engineering/`userdebug` firmware; Qualcomm AI Hub deployment; or a device whose policy permits
+  third-party unsigned-PD HTP.
+
 ## Reproduce the artifact
 
 ```bash
