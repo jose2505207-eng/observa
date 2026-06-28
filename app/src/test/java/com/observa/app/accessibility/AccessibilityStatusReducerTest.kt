@@ -26,7 +26,7 @@ class AccessibilityStatusReducerTest {
     @Test
     fun detectorState_namesBackendShort() {
         assertEquals("Detector backend: XNNPACK", AccessibilityStatusReducer.detectorState(state(detector = DetectorBackend.XNNPACK)))
-        assertEquals("Detector backend: QNN", AccessibilityStatusReducer.detectorState(state(detector = DetectorBackend.QNN)))
+        assertEquals("Detector backend: QNN/NPU", AccessibilityStatusReducer.detectorState(state(detector = DetectorBackend.QNN)))
         assertEquals("Detector backend: heuristic fallback", AccessibilityStatusReducer.detectorState(state(detector = DetectorBackend.HEURISTIC)))
     }
 

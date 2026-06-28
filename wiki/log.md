@@ -4,6 +4,28 @@ Newest entries first. Append an entry whenever you make a meaningful change to t
 
 ---
 
+## 2026-06-28 — v2.2.0 QNN/NPU detector pipeline (export→load works; device DSP blocks HTP)
+
+Real QNN/NPU path built end-to-end and validated on the connected S25 Ultra (`R3CXC08009D`). Build +
+unit tests green (incl. 5 raw-head parser tests); APK has no `INTERNET`; XNNPACK detector preserved;
+accessibility operating layer intact. **NPU not claimed active** (honest XNNPACK fallback). Not tagged.
+
+- **Raw-head QNN export.** `export_detector.py --qnn-raw-head` swaps the YOLOv8 Detect head's forward
+  to return the raw per-scale `cat(box-DFL, class-logits)` (`[1,144,40/20/10²]`) before anchor decode,
+  dodging the `make_anchors`/`I64toI32` `expand 3→1` failure. Whole graph lowers to QNN/HTP → real
+  6.9 MB `QnnBackend` `.pte` (`detector_yolov8n_qnn_sm8750.pte`).
+- **On-device decode** `YoloRawHeadParser` (DFL→dist2bbox→sigmoid→class-aware NMS), unit-tested.
+- **Packaged** v79 device libs in `jniLibs/arm64-v8a` (+`useLegacyPackaging` so the skel extracts);
+  `model_manifest.json`; `ExecuTorchDetector` tries QNN first, accepts only on a successful warm-up
+  `forward`, else XNNPACK. Status surfaces `backendStatusLine` truthfully; fixed a stale-status node
+  (detectorBackend is now a Compose state set after model init).
+- **Device blocker:** `.pte` loads, HTP init fails — `QnnDsp Failed to load skel, error 4000` /
+  `device_handle ... error=14001`, unchanged after setting `ADSP_LIBRARY_PATH`. Production 8-Elite cDSP
+  refuses an unsigned skel from `/data` (needs signed PD / `/vendor` skel / eng build). Device shows
+  "Detector backend: XNNPACK", inference ~32 ms. Full detail: `docs/implementation/MODEL_RUNTIME.md`.
+
+---
+
 ## 2026-06-27 — v2.2.0 native TalkBack + braille operating layer
 
 App build + unit tests green (incl. 10 new reducer tests); no `INTERNET`; XNNPACK detector path and

@@ -61,10 +61,12 @@ loads them via Facebook SoLoader — so the app declares `com.facebook.fbjni:fbj
 the model load throws `ClassNotFoundException: NativeLoader` and silently falls back to heuristic** —
 this was the original blocker and is now fixed.
 
-## QNN / NPU path — host AOT now UNBLOCKED; YOLOv8n graph still blocks (v2.1.0)
+## QNN / NPU path — host AOT + raw-head export WORK; device DSP skel-load blocks HTP (v2.2.0)
 
-Concrete attempt made for **SM8750 (Snapdragon 8 Elite, HTP v79)**. The previously-documented host
-init blocker is **now solved**; a new, deeper model-graph blocker remains. Honest status, no faking.
+Concrete attempt for **SM8750 (Snapdragon 8 Elite, HTP v79)**. Two earlier blockers are **solved**
+(host QnnManager init, and the YOLOv8n head graph). A real QNN `.pte` is built, packaged, and **loads
+on device**, but HTP execution is gated by the device's DSP security model. Honest status, no faking —
+the app falls back to XNNPACK and says so.
 
 ### What was the blocker (v2.0.0) and what really caused it
 The QNN partitioner's host op-support check builds a host `QnnManager` and called `InitBackend()`,
@@ -101,24 +103,47 @@ Verified: `QnnManager(opt).InitBackend()` now returns **0 (success)**, and a rea
 lowers fully to QNN HTP (`aten.convolution|True`, `aten.relu|True`, HTP compiler runs, valid
 `QnnBackend` `.pte` produced).
 
-### New blocker: the YOLOv8n graph itself
-Exporting the **full YOLOv8n** (320×320) via `to_edge_transform_and_lower_to_qnn` now reaches QNN's
-graph passes and fails in the **`I64toI32` pass** at the YOLOv8 detection head's anchor decode
-(`make_anchors`): `RuntimeError: expand: attempting to expand a dimension of length 3 -> 1`. This is a
-model-graph lowering incompatibility, not a QNN init/SDK problem. Resolving it needs the head reshaped
-(export raw multi-scale outputs and decode in the parser, or quantize/annotate the head) — a separate,
-larger task, and one that **cannot be device-verified in this session (no device attached).**
+### Fixed the YOLOv8n graph: raw-head export
+The decoded head failed QNN's `I64toI32` pass at `make_anchors` (`expand: dimension 3 -> 1`). Fix:
+export the **raw multi-scale head** (`scripts/export_detector.py --qnn-raw-head`) — the Detect head's
+`forward` is replaced so it returns `cat(box-DFL, class-logits)` per scale *before* anchor decode:
+`[1,144,40,40] [1,144,20,20] [1,144,10,10]` (144 = 4·reg_max + nc = 64 + 80). The graph is then pure
+conv/silu/concat/sigmoid and **lowers fully to QNN/HTP** — all ops `| True`, a real **6.9 MB
+`QnnBackend` `.pte`** is produced. The anchor decode + DFL + dist2bbox + NMS now run on the Android CPU
+in `YoloRawHeadParser` (unit-tested), producing detections identical to the XNNPACK path.
 
-### Still required to actually ship QNN
-1. Resolve the YOLOv8n head `I64toI32` issue (above) to get a QNN `.pte`.
-2. Toolchain match: the on-device AAR is **1.4.0a0**; the venv import is the **1.3.1 wheel** — a QNN
-   `.pte` must be schema-compatible with the AAR runtime (re-verify, or export with the 1.4.0a0 tree).
-3. Package the v79 device `.so`s in APK `jniLibs/arm64-v8a` (`libQnnHtp.so`, `libQnnSystem.so`,
-   `libQnnHtpV79Stub.so`, `hexagon-v79/.../libQnnHtpV79Skel.so`) — the AAR ships only the ET↔QNN bridge.
+### Packaged + selected at runtime
+`detector_yolov8n_qnn_sm8750.pte` is bundled with the v79 device libs in `jniLibs/arm64-v8a`
+(`libQnnHtp.so`, `libQnnSystem.so`, `libQnnHtpV79Stub.so`, `libQnnHtpPrepare.so`,
+`libQnnHtpV79Skel.so`; the AAR already ships `libqnn_executorch_backend.so`). `ExecuTorchDetector`
+tries the QNN model first and accepts QNN **only** if `forward` lists a QNN backend AND a warm-up
+`forward` actually executes; otherwise it falls back to the proven XNNPACK `observa_detector.pte`.
+`model_manifest.json` records both. Toolchain note: export uses the **1.3.1 wheel** pybind; the QNN
+`.pte` program schema loads fine on the **1.4.0a0** AAR (same as the working XNNPACK `.pte`).
 
-Because **XNNPACK CPU already meets the <100 ms target at 32 ms**, QNN remains a battery/thermal-headroom
-optimization, not a latency need. The app reports QNN truthfully (`LOADED_QNN` only when `forward`
-backends include a QNN backend), so it lights up automatically once a QNN `.pte` loads — no fake claims.
+### Remaining blocker: device DSP refuses the unsigned HTP skel
+On the **production Galaxy S25 Ultra**, the QNN `.pte` loads but HTP device init fails at warm-up
+(captured from on-device `adb logcat`):
+
+```
+[Qnn ExecuTorch] QnnDsp <E> loadRemoteSymbols failed with err 4000
+[Qnn ExecuTorch] QnnDsp <E> Failed to load skel, error: 4000
+[Qnn ExecuTorch] Failed to create device_handle for Backend ID 6, error=14001
+ExecuTorch: Init failed for backend QnnBackend: 0x1
+```
+
+`err 4000` (AEE unable-to-load) persists even with `ADSP_LIBRARY_PATH` set to the app's extracted
+native-lib dir (which contains `libQnnHtpV79Skel.so`, verified). Root cause: the Snapdragon 8 Elite
+cDSP will not load an **unsigned** HTP skel from an app `/data` path via fastRPC — it requires a
+signed PD or the skel staged in `/vendor/lib/rfsa/adsp` (root). Neither is achievable from a normal
+sideloaded app, so **QNN/NPU cannot be activated on this production handset**. The detector therefore
+runs on **XNNPACK CPU (median ~32 ms)** and the UI/debug status reports
+`Detector backend: XNNPACK CPU fallback. QNN attempted: <skel load 4000>` — never a fake QNN claim.
+
+To actually run QNN/NPU here would need one of: an engineering/`userdebug` build permitting unsigned
+PD, root to stage the skel in `/vendor`, or a Qualcomm-signed skel/PD. The full pipeline (export →
+package → load → honest backend selection) is in place and would light up automatically on such a
+device, because `LOADED_QNN` is set only when a QNN warm-up `forward` truly succeeds.
 
 ## Reproduce the artifact
 

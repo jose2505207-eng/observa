@@ -28,3 +28,10 @@ captures/
 
 # Model source weights (re-downloaded by scripts/export_detector.py)
 yolov8n.pt
+
+# Qualcomm QNN runtime libs — Qualcomm-licensed, large (~105MB), and not redistributable in-repo.
+# Recreate before building the QNN-enabled APK (see docs/implementation/MODEL_RUNTIME.md):
+#   SDK=$QNN_SDK_ROOT; DST=app/src/main/jniLibs/arm64-v8a; mkdir -p "$DST"
+#   cp "$SDK"/lib/aarch64-android/{libQnnHtp,libQnnSystem,libQnnHtpV79Stub,libQnnHtpPrepare}.so "$DST"/
+#   cp "$SDK"/lib/hexagon-v79/unsigned/libQnnHtpV79Skel.so "$DST"/
+app/src/main/jniLibs/

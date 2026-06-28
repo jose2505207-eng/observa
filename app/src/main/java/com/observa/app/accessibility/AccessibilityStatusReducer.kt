@@ -3,7 +3,7 @@ package com.observa.app.accessibility
 /** Which real inference path is active, in short braille-friendly terms. */
 enum class DetectorBackend(val label: String) {
     XNNPACK("XNNPACK"),
-    QNN("QNN"),
+    QNN("QNN/NPU"),
     HEURISTIC("heuristic fallback"),
 }
 

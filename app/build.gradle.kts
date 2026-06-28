@@ -35,6 +35,13 @@ android {
     buildFeatures {
         compose = true
     }
+    packaging {
+        jniLibs {
+            // Extract native libs at install so the Hexagon DSP can load the QNN v79 skel from a
+            // real filesystem path (fastRPC cannot load it from inside the compressed APK).
+            useLegacyPackaging = true
+        }
+    }
     testOptions {
         unitTests {
             // Let android.util.Log (and other stubs) return defaults instead of throwing in JVM tests.

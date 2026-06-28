@@ -42,9 +42,15 @@ def main() -> int:
     ap.add_argument("--weights", default="yolov8n.pt")
     ap.add_argument("--imgsz", type=int, default=640)
     ap.add_argument("--qnn", action="store_true", help="lower to the Qualcomm QNN backend (NPU/HTP)")
+    ap.add_argument("--qnn-raw-head", action="store_true",
+                    help="QNN export returning the RAW multi-scale YOLOv8 head (pre-anchor-decode). "
+                         "This avoids make_anchors / int64 grids / the I64toI32 'expand 3->1' failure; "
+                         "the decode + NMS are done on Android in YoloRawHeadParser. Implies --qnn.")
     ap.add_argument("--no-xnnpack", action="store_true",
                     help="disable the XNNPACK CPU delegate (export slow portable kernels)")
     args = ap.parse_args()
+    if args.qnn_raw_head:
+        args.qnn = True
 
     try:
         import torch
@@ -58,6 +64,20 @@ def main() -> int:
     print(f"[export] loading {args.weights}")
     model = YOLO(args.weights).model.eval()
 
+    if args.qnn_raw_head:
+        # Replace the Detect head's forward with one that returns the raw per-scale tensors
+        # (cat(box-DFL, class-logits)) BEFORE anchor decode/DFL/NMS. Those decode ops use int64
+        # anchor grids (make_anchors) that break QNN's I64toI32 pass; doing them on-device instead
+        # keeps the exported graph pure conv/silu/concat → fully QNN/HTP-lowerable. The matching
+        # decoder is app/.../runtime/YoloRawHeadParser.kt.
+        import types
+        det = model.model[-1]
+        def _raw_forward(self, x):
+            return tuple(torch.cat((self.cv2[i](x[i]), self.cv3[i](x[i])), 1) for i in range(self.nl))
+        det.forward = types.MethodType(_raw_forward, det)
+        print(f"[export] raw-head mode: reg_max={det.reg_max} nc={det.nc} nl={det.nl} "
+              f"(output channels = 4*reg_max + nc = {4 * det.reg_max + det.nc})")
+
     example = (torch.randn(1, 3, args.imgsz, args.imgsz),)
     print("[export] tracing + exporting to ATen")
     exported = torch.export.export(model, example)
@@ -70,10 +90,12 @@ def main() -> int:
         # SAME QNN SDK version (see docs/implementation/MODEL_RUNTIME.md — the prebuilt wheel's pybind
         # had an ABI mismatch with SDK 2.47 that made `InitBackend` fail; rebuilding it fixes that).
         #
-        # NOTE (v2.1.0): the QNN host backend now initializes and lowers real graphs to HTP, but the
-        # full YOLOv8n graph still fails QNN's `I64toI32` pass at the detection head's anchor decode
-        # (`RuntimeError: expand: dimension 3 -> 1`). Until that head is reshaped for QNN this `--qnn`
-        # path does not yet produce a YOLOv8n `.pte`; XNNPACK remains the shipped detector.
+        # NOTE (v2.2.0): with --qnn-raw-head the full YOLOv8n graph lowers cleanly to QNN/HTP and a
+        # real QnnBackend `.pte` is produced (the decoded-head `--qnn` path still hits the I64toI32
+        # 'expand 3->1' failure at make_anchors — use --qnn-raw-head). The `.pte` LOADS on device but
+        # HTP execution is gated by the device DSP: on a production S25 Ultra the cDSP rejects the
+        # unsigned HTP skel ("Failed to load skel, error 4000"), so OBSERVA falls back to XNNPACK and
+        # reports it honestly. See docs/implementation/MODEL_RUNTIME.md.
         from executorch.backends.qualcomm.utils.utils import (
             generate_qnn_executorch_compiler_spec, generate_htp_compiler_spec,
             to_edge_transform_and_lower_to_qnn)

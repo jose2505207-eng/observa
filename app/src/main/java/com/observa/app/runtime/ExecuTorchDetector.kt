@@ -14,24 +14,24 @@ import java.io.File
  * Real ExecuTorch inference path. It genuinely attempts to load and run a bundled `.pte`, but is
  * honest at every step:
  *
- *  - model absent  → [InferenceStatus.UNAVAILABLE], heuristic fallback, no detections.
- *  - load fails    → [InferenceStatus.FAILED], heuristic fallback, exact error logged, no crash.
- *  - load succeeds → [InferenceStatus.LOADED_QNN] ONLY if `forward`'s MethodMetadata.getBackends()
- *                    includes a QNN backend; otherwise [InferenceStatus.LOADED_CPU].
- *  - any output    → routed through a [DetectionParser]; the default YOLO parser returns empty for
- *                    any unrecognized output shape, so no fabricated detections are ever produced.
+ *  - Tries the **QNN/NPU** model first ([qnnAssetPath], raw-head export, decoded by [YoloRawHeadParser]).
+ *    QNN is accepted only if (a) the model's `forward` metadata actually lists a QNN backend AND
+ *    (b) a warm-up `forward` executes without throwing — so "QNN active" can never be faked when the
+ *    device QNN/HTP runtime is missing or fails to initialize.
+ *  - Falls back to the proven **XNNPACK CPU** model ([cpuAssetPath], decoded head, [YoloDetectionParser]).
+ *  - model absent → [InferenceStatus.UNAVAILABLE]; load/run fails → fall back or
+ *    [InferenceStatus.FAILED]; exact errors logged; never crashes.
+ *  - any output → routed through the selected [DetectionParser], which returns empty for any
+ *    unrecognized shape, so no fabricated detections are ever produced.
  *
  * Pixels for inference come from [FrameInput.rgb], which the analyzer fills only while a model is
  * loaded. Inference runs off the UI thread (see ObservaController).
  */
 class ExecuTorchDetector(
-    private val modelAssetPath: String = "models/observa_detector.pte",
+    private val qnnAssetPath: String = "models/detector_yolov8n_qnn_sm8750.pte",
+    private val cpuAssetPath: String = "models/observa_detector.pte",
     private val inputWidth: Int = 320,
     private val inputHeight: Int = 320,
-    // Parser's inputSize MUST match the exported model's input resolution (box coords are in
-    // input-pixel units). The bundled detector is YOLOv8n exported at 320×320 with the XNNPACK
-    // CPU delegate (see scripts/export_detector.py / assets/models/README.md).
-    private val parser: DetectionParser = YoloDetectionParser(inputSize = inputWidth),
 ) : InferenceEngine {
 
     @Volatile
@@ -39,8 +39,12 @@ class ExecuTorchDetector(
         private set
 
     @Volatile private var module: Module? = null
+    // Parser is chosen per loaded model: raw-head for QNN, decoded-head for XNNPACK.
+    @Volatile private var parser: DetectionParser = YoloDetectionParser(inputSize = inputWidth)
     var qnn: QnnStatus = QnnStatus.UNKNOWN; private set
     var detail: String = "not initialized"; private set
+    /** Exact reason the QNN/NPU path was not used (empty if QNN is active). For debug status. */
+    var qnnError: String = ""; private set
 
     // --- Diagnostics (read by the UI/Braille diagnostics surface) ---
     var modelBytes: Long = 0L; private set
@@ -55,42 +59,95 @@ class ExecuTorchDetector(
     private var latencyCount = 0L
     val avgLatencyMs: Long get() = if (latencyCount == 0L) 0L else latencySum / latencyCount
 
+    /** A model OBSERVA may load, in priority order. */
+    private class Candidate(
+        val path: String,
+        val parser: DetectionParser,
+        val requireQnn: Boolean,
+    )
+
     override fun initialize(context: Context): InferenceStatus {
         qnn = QnnRuntimeChecker.check(context)
-        if (!assetExists(context, modelAssetPath)) {
-            status = InferenceStatus.UNAVAILABLE
-            detail = "model absent · ${qnn.label}"
-            Log.i(TAG, "model absent at assets/$modelAssetPath → heuristic fallback. ${qnn.label}")
-            return status
+        // Point the Hexagon DSP (cDSP) at our extracted skel so QNN HTP can load libQnnHtpV79Skel.so.
+        // Without this the device reports "Failed to load skel, error 4000" and HTP init fails.
+        runCatching {
+            val nativeDir = context.applicationInfo.nativeLibraryDir
+            val dspPaths = "$nativeDir;/vendor/dsp/cdsp;/vendor/lib/rfsa/adsp;/vendor/lib64/rfsa/adsp;/system/lib/rfsa/adsp"
+            android.system.Os.setenv("ADSP_LIBRARY_PATH", dspPaths, true)
+            Log.i(TAG, "ADSP_LIBRARY_PATH=$dspPaths")
+        }.onFailure { Log.w(TAG, "could not set ADSP_LIBRARY_PATH: ${it.message}") }
+        val candidates = listOf(
+            // QNN/NPU first — must prove a QNN backend AND a working warm-up forward.
+            Candidate(qnnAssetPath, YoloRawHeadParser(), requireQnn = true),
+            // Proven XNNPACK CPU fallback (decoded head).
+            Candidate(cpuAssetPath, YoloDetectionParser(inputSize = inputWidth), requireQnn = false),
+        )
+
+        for (cand in candidates) {
+            if (!assetExists(context, cand.path)) {
+                if (cand.requireQnn) qnnError = "QNN model not bundled ($cand.path)"
+                continue
+            }
+            try {
+                val path = copyAssetToFiles(context, cand.path)
+                val bytes = File(path).length()
+                val t0 = SystemClock.elapsedRealtime()
+                val m = Module.load(path)
+                val ms = SystemClock.elapsedRealtime() - t0
+                val backendList = runCatching { m.getMethodMetadata("forward").backends.joinToString() }
+                    .getOrDefault("")
+                val usesQnn = backendList.contains("qnn", ignoreCase = true)
+                if (cand.requireQnn && !usesQnn) {
+                    m.close()
+                    qnnError = "model loaded but no QNN backend (backends=[$backendList])"
+                    Log.w(TAG, "QNN candidate rejected: $qnnError → trying next")
+                    continue
+                }
+                // Warm-up forward: proves the backend actually executes on this device. If the QNN/HTP
+                // runtime libs are missing or HTP fails to init, this throws and we fall back honestly.
+                warmUp(m)
+
+                module = m
+                parser = cand.parser
+                modelBytes = bytes
+                modelVersion = readAsset(context, "${cand.path}.version") ?: "unspecified"
+                loadMs = ms
+                backends = backendList
+                status = if (usesQnn) InferenceStatus.LOADED_QNN else InferenceStatus.LOADED_CPU
+                detail = "${status.label} · ${modelBytes / 1024}KB · v=$modelVersion · backends=[$backends]" +
+                    if (status == InferenceStatus.LOADED_CPU && qnnError.isNotBlank()) " · QNN: $qnnError" else ""
+                Log.i(
+                    TAG,
+                    "load success in ${loadMs}ms; model=${cand.path}; bytes=$modelBytes; " +
+                        "version=$modelVersion; forward backends=[$backends]; parser=${parser.name}; " +
+                        if (usesQnn) "QNN/NPU ACTIVE." else "XNNPACK CPU. ${if (qnnError.isNotBlank()) "QNN attempted: $qnnError" else ""}",
+                )
+                return status
+            } catch (e: Throwable) {
+                module = null
+                if (cand.requireQnn) {
+                    qnnError = e.message ?: e.toString()
+                    Log.e(TAG, "QNN candidate failed to load/warm-up → falling back to XNNPACK", e)
+                    continue
+                }
+                status = InferenceStatus.FAILED
+                detail = "load failed: ${e.message} · ${qnn.label}"
+                Log.e(TAG, "model load failed → heuristic fallback", e)
+                return status
+            }
         }
-        modelVersion = readAsset(context, "$modelAssetPath.version") ?: "unspecified"
-        return try {
-            val path = copyAssetToFiles(context, modelAssetPath)
-            modelBytes = File(path).length()
-            val t0 = SystemClock.elapsedRealtime()
-            val m = Module.load(path)
-            module = m
-            loadMs = SystemClock.elapsedRealtime() - t0
-            val methods = runCatching { m.getMethods().joinToString() }.getOrDefault("?")
-            backends = runCatching { m.getMethodMetadata("forward").backends.joinToString() }
-                .getOrDefault("")
-            val usesQnn = backends.contains("qnn", ignoreCase = true)
-            status = if (usesQnn) InferenceStatus.LOADED_QNN else InferenceStatus.LOADED_CPU
-            detail = "${status.label} · ${modelBytes / 1024}KB · v=$modelVersion · backends=[$backends]"
-            Log.i(
-                TAG,
-                "load success in ${loadMs}ms; bytes=$modelBytes; version=$modelVersion; " +
-                    "methods=[$methods]; forward backends=[$backends]; parser=${parser.name}; " +
-                    "QNN ${if (usesQnn) "ACTIVE for this model" else "present but NOT active (model not QNN-delegated)"}.",
-            )
-            status
-        } catch (e: Throwable) {
-            module = null
-            status = InferenceStatus.FAILED
-            detail = "load failed: ${e.message} · ${qnn.label}"
-            Log.e(TAG, "model load failed → heuristic fallback", e)
-            status
-        }
+
+        status = InferenceStatus.UNAVAILABLE
+        detail = "no model loaded · ${qnn.label}" + if (qnnError.isNotBlank()) " · QNN: $qnnError" else ""
+        Log.i(TAG, "no detector model available → heuristic fallback. $detail")
+        return status
+    }
+
+    /** One forward on a zeroed input to confirm the loaded backend can actually execute. */
+    private fun warmUp(m: Module) {
+        val input = FloatArray(3 * inputWidth * inputHeight)
+        val tensor = Tensor.fromBlob(input, longArrayOf(1, 3, inputHeight.toLong(), inputWidth.toLong()))
+        m.forward(EValue.from(tensor))
     }
 
     override suspend fun analyzeFrame(frame: FrameInput): List<Detection> {

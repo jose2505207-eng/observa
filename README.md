@@ -26,7 +26,7 @@ Android-native, low-latency, battery-conscious, on-device inference (ExecuTorch)
 - **No `INTERNET` permission** — the app physically cannot use the network (verified `aapt2`/`dumpsys`).
 
 **Honestly NOT done (no faking):**
-- **QNN/NPU acceleration** — the model runs on the **XNNPACK CPU delegate** (32 ms, already under target). The QNN delegate library is packaged and the QNN SDK is available, but a QNN-lowered `.pte` also needs the Qualcomm HTP runtime libs in the APK; never claimed active unless `MethodMetadata.getBackends()` proves it. See [`docs/implementation/MODEL_RUNTIME.md`](docs/implementation/MODEL_RUNTIME.md).
+- **QNN/NPU acceleration** — the full pipeline is built: a real HTP-lowered `QnnBackend` `.pte` (raw-head export), the v79 runtime libs packaged in `jniLibs`, and runtime backend selection that prefers QNN. On the **retail S25 Ultra** the `.pte` loads but the Hexagon DSP refuses the unsigned HTP skel (`error 4000`, needs a signed PD / engineering build), so OBSERVA **falls back to the XNNPACK CPU delegate (32 ms, under target) and reports it honestly** — `LOADED_QNN` is set only when a QNN warm-up `forward` truly succeeds. See [`docs/implementation/MODEL_RUNTIME.md`](docs/implementation/MODEL_RUNTIME.md).
 - **Doors / stairs / curbs / crosswalks** — not in COCO-80; would need a model trained for them.
 - **Translation mode** — on-demand mode shell only; no on-device translation model bundled yet (never cloud).
 - **Live GPS** navigation (uses a documented demo location + real compass) and **map packs**.

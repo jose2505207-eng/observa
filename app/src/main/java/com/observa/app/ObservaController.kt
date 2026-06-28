@@ -226,13 +226,18 @@ class ObservaController(context: Context) {
     /** Whether an on-device translation model is bundled. Honestly false (mode is a shell). */
     val translationInstalled: Boolean = false
 
-    /** Short detector backend, mapped truthfully from the real inference status. */
-    val detectorBackend: DetectorBackend
-        get() = when (executorch.status) {
-            InferenceStatus.LOADED_QNN -> DetectorBackend.QNN
-            InferenceStatus.LOADED_CPU -> DetectorBackend.XNNPACK
-            else -> DetectorBackend.HEURISTIC
-        }
+    /**
+     * Short detector backend, mapped truthfully from the real inference status. Backed by a Compose
+     * state set once the model finishes initializing, so the accessible status node recomposes and
+     * stops showing the pre-load "heuristic fallback" placeholder.
+     */
+    var detectorBackend by mutableStateOf(DetectorBackend.HEURISTIC); private set
+
+    private fun backendOf(status: InferenceStatus): DetectorBackend = when (status) {
+        InferenceStatus.LOADED_QNN -> DetectorBackend.QNN
+        InferenceStatus.LOADED_CPU -> DetectorBackend.XNNPACK
+        else -> DetectorBackend.HEURISTIC
+    }
 
     private fun a11ySnapshot() = A11yState(
         awarenessActive = observing,
@@ -262,8 +267,19 @@ class ObservaController(context: Context) {
     /** Silence non-hazard output. Hazards still fire (safety). Same path as the emergency pause. */
     fun silenceAlerts() = emergencyPause()
 
+    /** Truthful one-line backend status for current/debug surfaces. Never claims NPU unless active. */
+    val backendStatusLine: String
+        get() = when (detectorBackend) {
+            DetectorBackend.QNN -> "Detector backend: QNN/NPU active"
+            DetectorBackend.XNNPACK ->
+                if (executorch.qnnError.isNotBlank())
+                    "Detector backend: XNNPACK CPU fallback. QNN attempted: ${executorch.qnnError}"
+                else "Detector backend: XNNPACK CPU"
+            DetectorBackend.HEURISTIC -> "Detector backend: heuristic fallback (no model)"
+        }
+
     /** Speak the engineering/debug detector status (kept out of normal alert output). */
-    fun announceDebugStatus() = respond("${detectorStateDesc}. ${aiDiagnostics}")
+    fun announceDebugStatus() = respond("$backendStatusLine. ${aiDiagnostics}")
 
     /**
      * Capture one camera frame and run offline OCR on demand. Declines honestly if OCR is not
@@ -463,6 +479,7 @@ class ObservaController(context: Context) {
         if (!modelInitialized) {
             withContext(Dispatchers.IO) { executorch.initialize(appContext) }
             modelInitialized = true
+            detectorBackend = backendOf(executorch.status)
             updateBrailleStatus()
         }
         while (coroutineContext.isActive) {

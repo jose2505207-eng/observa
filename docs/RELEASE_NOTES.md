@@ -4,7 +4,22 @@ Offline-first, privacy-first AI vision assistant for blind and low-vision users.
 `main` shippable: each builds, passes unit tests, has **no `INTERNET` permission**, and launches in
 airplane mode with camera preview intact.
 
-## v2.2.0 — native TalkBack + braille operating layer (not yet tagged)
+## v2.2.0 — QNN/NPU detector pipeline (export→load) + native accessibility layer (not yet tagged)
+
+### QNN/NPU (real pipeline; not active on the production handset — honest fallback)
+- **YOLOv8n now lowers to QNN/HTP.** New `scripts/export_detector.py --qnn-raw-head` exports the raw
+  multi-scale head (`[1,144,40/20/10²]`, pre-anchor-decode), avoiding the `make_anchors`/`I64toI32`
+  `expand 3→1` failure. Produces a real **6.9 MB `QnnBackend` `.pte`** (`detector_yolov8n_qnn_sm8750.pte`).
+- **On-device decode** in `YoloRawHeadParser` (DFL + dist2bbox + sigmoid + class-aware NMS; 5 unit
+  tests) — detections identical to the XNNPACK path.
+- **Packaged** the v79 device libs in `jniLibs/arm64-v8a` + `model_manifest.json`. `ExecuTorchDetector`
+  tries QNN first and accepts it **only** after a successful warm-up `forward`, else XNNPACK.
+- **Blocker on this device:** the `.pte` loads but the production S25 Ultra cDSP rejects the unsigned
+  HTP skel (`QnnDsp Failed to load skel, error 4000`), even with `ADSP_LIBRARY_PATH` set. Needs a
+  signed PD / engineering build / root. **NPU is not claimed active**; detector runs XNNPACK CPU
+  (~32 ms) and the status reads `XNNPACK CPU fallback. QNN attempted: <skel 4000>`. No `INTERNET`.
+
+### Native TalkBack + braille operating layer
 - **Operable without visual buttons.** New native operating layer: stable **Current status**, **Last
   alert**, **Available actions** accessible nodes, with TalkBack/braille **custom actions** for every
   core flow (start/pause awareness, repeat last alert, OCR, scene question, translation mode, silence
