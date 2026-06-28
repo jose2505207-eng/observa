@@ -4,6 +4,27 @@ Newest entries first. Append an entry whenever you make a meaningful change to t
 
 ---
 
+## 2026-06-27 — v3.0.0 REAL on-device ExecuTorch inference (Agent 1 gate met)
+
+Build + unit tests pass; no `INTERNET`; **device-verified on S25 Ultra (SM8750) in Airplane Mode**.
+
+- **Real local ML detector shipped.** Bundled `assets/models/observa_detector.pte`: YOLOv8n COCO-80
+  exported to ExecuTorch at 320×320 with the **XNNPACK** CPU delegate, using the local `executorch/`
+  1.4.0a0 tree + torch 2.12.1 (`executorch/.venv`) so the `.pte` schema matches the bundled AAR.
+- **Fixed the silent load blocker:** declared `com.facebook.fbjni:fbjni:0.7.0` +
+  `com.facebook.soloader:nativeloader:0.10.5` — ExecuTorch's `Module` loads its `.so` via SoLoader;
+  without these, `Module.load` threw `ClassNotFoundException: NativeLoader` → heuristic fallback.
+- **Measured on device:** load ~11 ms; inference **median ~32 ms, p90 49 ms, p95 58 ms** (54-sample
+  run); `forward backends=[XnnpackBackend]`. Under the 100 ms danger-recognition target. Portable
+  kernels were ~4490 ms — XNNPACK is ~140× faster.
+- Detector input 640→320, RGB capture 256→320 (match model input; favor latency/battery).
+  `YoloDetectionParser` now selects the `[1,84,N]` tensor by shape among the 6 raw head outputs
+  (regression test added). `objects=0` reported honestly when nothing recognizable is in frame.
+- **QNN attempted, not shipped:** QNN SDK present (`qairt/2.47.0.260601`), `--qnn` export path added,
+  but a QNN `.pte` needs the Qualcomm HTP runtime libs in the APK; XNNPACK already meets the target.
+- Docs: `docs/implementation/MODEL_RUNTIME.md`, `AUDIT_CURRENT_STATE.md`; updated `executorch-qnn`
+  (status → **current**), `PERFORMANCE_METRICS`, `current-status`, README, `assets/models/README`.
+
 ## 2026-06-28 — v1.10.0 physical-button hotkeys + honest find-exit (v2 Part D)
 
 Branch `feature/v2-braille-hotkeys-accessibility`. Build + 122 unit tests pass; no `INTERNET`;

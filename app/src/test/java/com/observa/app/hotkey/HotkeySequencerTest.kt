@@ -12,7 +12,8 @@ class HotkeySequencerTest {
         assertEquals(HotkeyCommand.REPEAT_LAST, HotkeySequencer.map(HotkeyButton.VOLUME_UP, 1))
         assertEquals(HotkeyCommand.STATUS, HotkeySequencer.map(HotkeyButton.VOLUME_UP, 2))
         assertEquals(HotkeyCommand.READ_TEXT, HotkeySequencer.map(HotkeyButton.VOLUME_UP, 3))
-        assertEquals(HotkeyCommand.FIND_EXIT, HotkeySequencer.map(HotkeyButton.VOLUME_UP, 4))
+        // Mission cap: no more than three clicks per volume button — a 4th press is unmapped.
+        assertEquals(HotkeyCommand.NONE, HotkeySequencer.map(HotkeyButton.VOLUME_UP, 4))
         assertEquals(HotkeyCommand.MUTE_TOGGLE, HotkeySequencer.map(HotkeyButton.VOLUME_DOWN, 1))
         assertEquals(HotkeyCommand.STOP_NAVIGATION, HotkeySequencer.map(HotkeyButton.VOLUME_DOWN, 2))
         assertEquals(HotkeyCommand.EMERGENCY_PAUSE, HotkeySequencer.map(HotkeyButton.VOLUME_DOWN, 3))

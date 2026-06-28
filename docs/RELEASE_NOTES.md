@@ -4,6 +4,17 @@ Offline-first, privacy-first AI vision assistant for blind and low-vision users.
 `main` shippable: each builds, passes unit tests, has **no `INTERNET` permission**, and launches in
 airplane mode with camera preview intact.
 
+## v3.0.0 — real on-device ExecuTorch inference
+- **Ships a real local ML object detector.** YOLOv8n (COCO-80) → ExecuTorch, 320×320, **XNNPACK** CPU
+  delegate, bundled as `assets/models/observa_detector.pte`. Verified on the Galaxy S25 Ultra
+  (Snapdragon 8 Elite) in Airplane Mode: load ~11 ms, **inference median ~32 ms (p95 ~58 ms)**,
+  `forward backends=[XnnpackBackend]` — under the 100 ms danger-recognition target.
+- Fixed the silent load blocker (fbjni + soloader nativeloader runtime deps for ExecuTorch's
+  `Module`). Detector 640→320 + RGB capture 256→320; parser selects the detection tensor by shape.
+- QNN/NPU attempted (SDK present, `--qnn` export path) but not shipped — XNNPACK already meets target.
+- Docs: `implementation/MODEL_RUNTIME.md`, `implementation/AUDIT_CURRENT_STATE.md`,
+  `demo/AIRPLANE_MODE_DEMO.md`; wiki `executorch-qnn` → **current**; `PERFORMANCE_METRICS` updated.
+
 ## v1.8.0 — production demo & release readiness
 - Final demo script, release checklist, validation matrix, and honest docs: `FINAL_DEMO.md`,
   `RELEASE_CHECKLIST.md`, `KNOWN_LIMITATIONS.md`, `PRIVACY_MODEL.md`, `PERFORMANCE_METRICS.md`,

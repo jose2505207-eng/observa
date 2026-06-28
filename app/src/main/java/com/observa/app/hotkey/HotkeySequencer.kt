@@ -48,11 +48,12 @@ class HotkeySequencer(
 
     companion object {
         fun map(button: HotkeyButton?, count: Int): HotkeyCommand = when (button) {
+            // Mission constraint: no more than three clicks per volume button. Find-exit is reached
+            // by voice ("find exit") or the front-tap map instead of a 4th press.
             HotkeyButton.VOLUME_UP -> when (count) {
                 1 -> HotkeyCommand.REPEAT_LAST
                 2 -> HotkeyCommand.STATUS
                 3 -> HotkeyCommand.READ_TEXT
-                4 -> HotkeyCommand.FIND_EXIT
                 else -> HotkeyCommand.NONE
             }
             HotkeyButton.VOLUME_DOWN -> when (count) {

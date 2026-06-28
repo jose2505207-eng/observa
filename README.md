@@ -12,10 +12,11 @@ Existing AI vision apps assume the user can already aim a camera at what matters
 
 Android-native, low-latency, battery-conscious, on-device inference (ExecuTorch).
 
-## Current status (v1.7)
+## Current status (v3 — real on-device model)
 
-**Working today, verified on a Galaxy S25 Ultra in Airplane Mode:**
-- Always-on CameraX loop (~25–32 FPS) with an on-device **brightness heuristic** detector + **hazard engine** (cooldown, scene memory, no spam).
+**Working today, verified on a Galaxy S25 Ultra (Snapdragon 8 Elite) in Airplane Mode:**
+- **Real on-device ML object detection** — YOLOv8n (COCO-80) exported to **ExecuTorch** (320×320, **XNNPACK** CPU delegate), bundled as `assets/models/observa_detector.pte` and run locally. Measured **median ~32 ms inference (p95 ~58 ms)**, under the 100 ms danger-recognition target; `forward backends=[XnnpackBackend]`. Person/vehicle/large-obstacle detections drive the hazard engine. (Brightness heuristic remains only as a no-model fallback.)
+- Always-on CameraX loop (~25–32 FPS) + **hazard engine** (cooldown, scene memory, no spam).
 - **Unified output**: TTS speech, **directional audio cues** (stereo-panned), **directional haptics**, and a **Braille/TalkBack live-region** status — one router, priority `HAZARD > NAVIGATION > OCR > MODE > INFO` (hazards interrupt; cues survive mute).
 - **On-demand OCR** (ML Kit bundled Latin model, fully offline) — "Read Text" reads signs aloud.
 - **Offline voice commands** (on-device recognizer): observing on/off, describe scene, what is ahead, read text, braille on/off/status, navigate to, stop navigation, where am I, repeat, mute/unmute, help.
@@ -24,8 +25,9 @@ Android-native, low-latency, battery-conscious, on-device inference (ExecuTorch)
 - **No `INTERNET` permission** — the app physically cannot use the network (verified `aapt2`/`dumpsys`).
 
 **Honestly NOT done (no faking):**
-- Real ML **object recognition** — the ExecuTorch + YOLO path is implemented and unit-tested, but **no `observa_detector.pte` is bundled** (toolchain/license/version blockers; reproducible export in [`scripts/export_detector.py`](scripts/export_detector.py)). The live detector is the brightness heuristic; the UI says `AI model: unavailable — heuristic fallback`.
-- **QNN acceleration** — the delegate library is detected but **not active** (no QNN-lowered model); never claimed active unless `MethodMetadata.getBackends()` proves it.
+- **QNN/NPU acceleration** — the model runs on the **XNNPACK CPU delegate** (32 ms, already under target). The QNN delegate library is packaged and the QNN SDK is available, but a QNN-lowered `.pte` also needs the Qualcomm HTP runtime libs in the APK; never claimed active unless `MethodMetadata.getBackends()` proves it. See [`docs/implementation/MODEL_RUNTIME.md`](docs/implementation/MODEL_RUNTIME.md).
+- **Doors / stairs / curbs / crosswalks** — not in COCO-80; would need a model trained for them.
+- **Translation mode** — on-demand mode shell only; no on-device translation model bundled yet (never cloud).
 - **Live GPS** navigation (uses a documented demo location + real compass) and **map packs**.
 - **Physical Braille display** verified (app-level live-region exposed; no hardware tested) and a full **human sensory pass**.
 
