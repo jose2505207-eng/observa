@@ -4,6 +4,38 @@ Offline-first, privacy-first AI vision assistant for blind and low-vision users.
 `main` shippable: each builds, passes unit tests, has **no `INTERNET` permission**, and launches in
 airplane mode with camera preview intact.
 
+## v2.5.0 — Offline map & language downloads, real ML Kit translation, two build flavors
+
+**The user can now see and use Download Map and Download Languages.** Navigation and translation are
+finished as visible, operable features with honest offline provisioning. NPU still blocked on retail
+(skel 4000); not claimed active.
+
+- **Two build flavors** (privacy-honest provisioning split):
+  - `demoOffline` (default): **NO INTERNET** — proves airplane-mode runtime. Verified: `aapt2` shows no
+    INTERNET/ACCESS_NETWORK_STATE.
+  - `provisioning` (`-setup`): **adds INTERNET + ACCESS_NETWORK_STATE** for one-time map/language
+    downloads. `BuildConfig.SETUP_MODE` gates network actions. Same `applicationId`, so models/packs
+    downloaded by the provisioning build persist for an `adb install -r` of the demoOffline build.
+- **Download Languages = real on-device ML Kit Translation.** `MlKitOnDeviceTranslator` +
+  `LanguageDownloadController`: download Spanish/English models once (provisioning build), then
+  translate **fully offline** (works in demoOffline with no INTERNET). Never fabricated — result is
+  ML Kit's actual output; readiness comes from ML Kit's downloaded-model set. New Language/Translation
+  screen with source/target, download/delete, a text field, Translate, result, and an honest
+  voice-input availability line. Test phrase "Where is the entrance?".
+- **Download Map.** `maps/` package: `MapPackStatus`, `MapRegion`, `MapPackVerifier`,
+  `MapPackRepository`, `MapDownloadController`. "Install demo map pack" writes an offline OBSERVA
+  waypoint bundle (works with no network, labeled "Demo offline map pack"); "Download area map" is
+  honestly gated to the provisioning build. "Ready offline" only when a verified file exists. New Map
+  Download screen (install/delete/status/progress).
+- **Visible buttons**: Awareness · Navigate · **Download Map** · Translate · **Download Languages** ·
+  Voice Commands · Read Signs · Repeat Alert (role=Button, contentDescription, large targets). New
+  Map/Language sub-screens; detector keeps running across screens.
+- **Accessibility Control Strip** gains: download map, translate, download languages, repeat
+  translation, repeat navigation, read signs, voice commands.
+- Build (both flavors) + **172 tests** green (+ OfflineProvisioningTest: TranslationReadinessRules,
+  MapPackVerifier). Device-verified: download buttons visible, detector ~16–28 ms, NPU one-shot still
+  skel 4000 → honest XNNPACK fallback.
+
 ## Unreleased — Visible Maps/Navigation + Translation UI, debug screen, sign reading
 
 - **Maps/Navigation and Translation are now visible and usable in the UI**, not just backend

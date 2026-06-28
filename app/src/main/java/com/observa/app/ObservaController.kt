@@ -113,23 +113,15 @@ class ObservaController(context: Context) {
     )
     private val streetSigns = com.observa.app.navigation.StreetSignTracker()
 
-    // --- Offline Translation Mode (honest readiness; never fakes a translation) ---
-    private val langPacks = com.observa.app.translation.OfflineLanguagePackManager(appContext)
-    // No offline translation engine / language-ID model is bundled in the no-INTERNET runtime build,
-    // so these report unavailable honestly. A provisioning flavor would supply real ones.
-    private val localTranslator = com.observa.app.translation.LocalTranslator()
-    private val translationTurns = com.observa.app.translation.TranslationTurnManager(
-        speech = com.observa.app.translation.LocalSpeechRecognizer { recognizer.available },
-        identifier = com.observa.app.translation.LanguageIdentifier(),
-        translator = localTranslator,
-        output = com.observa.app.translation.TranslationSpeechOutput { respond(it) },
-        targetLanguage = "en",
-    )
+    // --- Offline Translation Mode — real on-device ML Kit translation ---
+    /** Real ML Kit translation + language-pack download (download needs the provisioning build). */
+    val languageDownloads = com.observa.app.translation.LanguageDownloadController()
+    /** Real offline map-pack download/install (demo pack works offline; area maps need provisioning). */
+    val mapDownloads = com.observa.app.maps.MapDownloadController(appContext)
     private val translation = com.observa.app.translation.TranslationModeController(
-        packs = { langPacks.hasAnyPack },
+        packs = { languageDownloads.pairReady() },
         speechAvailable = { recognizer.available },
-        engineAvailable = { localTranslator.isReady() },
-        turns = translationTurns,
+        engineAvailable = { true }, // ML Kit translate engine is bundled; the gate is the language pack
     )
 
     // --- Offline readiness aggregation (setup/debug screen) ---
@@ -140,8 +132,8 @@ class ObservaController(context: Context) {
                 modelNeedsPixels, executorch.status.label,
             ),
             com.observa.app.translation.AssetReadiness("OCR", ocr.ready, if (ocr.ready) "ML Kit" else "unavailable"),
-            com.observa.app.translation.AssetReadiness("Language pack", langPacks.hasAnyPack, translation.statusLine()),
-            com.observa.app.translation.AssetReadiness("Map pack", mapPacks.hasAnyPack, mapPacks.statusLine()),
+            com.observa.app.translation.AssetReadiness("Language pack", languageDownloads.pairReady(), languageDownloads.statusLine()),
+            com.observa.app.translation.AssetReadiness("Map pack", mapDownloads.status == com.observa.app.maps.MapPackStatus.READY_OFFLINE, mapDownloads.statusLine()),
             com.observa.app.translation.AssetReadiness("Voice", recognizer.available, if (recognizer.available) "on-device" else "unavailable"),
         )
     }
@@ -297,7 +289,7 @@ class ObservaController(context: Context) {
         muted = muted,
         detector = detectorBackend,
         ocrReady = ocr.ready,
-        translationInstalled = langPacks.hasAnyPack,
+        translationInstalled = languageDownloads.pairReady(),
         navigating = navSession.active,
         lastAlert = if (lastAlert == "No alerts yet") null else lastAlert,
         orientation = if (orientationActive) orientationLine else null,
@@ -315,16 +307,47 @@ class ObservaController(context: Context) {
 
     // --- Offline Translation Mode (honest readiness; never fakes a translation) ---
     /** Truthful translation status: "ready offline" / "language pack missing" / "speech unavailable". */
-    val translationStatus: String get() = translation.statusLine()
-    fun startTranslation() = respond(translation.start())
-    fun stopTranslation() = respond(translation.stop())
-    fun repeatTranslation() = respond(translation.statusLine())
+    /** Honest text-translation readiness from the real ML Kit language pack state. */
+    val translationStatus: String get() = languageDownloads.statusLine()
+    val translationPair: String get() = "${languageDownloads.sourceLang} to ${languageDownloads.targetLang}"
+
+    /** "Start translation": translate the demo phrase offline if ready, else say what's missing. */
+    fun startTranslation() {
+        if (!languageDownloads.pairReady()) {
+            respond("${languageDownloads.statusLine()}. Open Download Languages to install ${languageDownloads.sourceLang} and ${languageDownloads.targetLang}.")
+            return
+        }
+        translateText(com.observa.app.translation.LanguageDownloadController.DEMO_PHRASE)
+    }
+
+    /** Translate arbitrary text offline via ML Kit; speaks + shows the result. Never fabricates. */
+    fun translateText(text: String) {
+        if (!languageDownloads.pairReady()) { respond(languageDownloads.statusLine()); return }
+        respond("Translating…")
+        languageDownloads.translate(text) { out -> respond(out) }
+    }
+
+    fun stopTranslation() = respond("Translation stopped.")
+    fun repeatTranslation() =
+        respond(languageDownloads.lastTranslation.ifBlank { languageDownloads.statusLine() })
+
+    /** Refresh real installed language packs (call when entering translation UI). */
+    fun refreshLanguagePacks() = languageDownloads.refresh()
+
+    // --- Download actions (also exposed as TalkBack/braille custom actions) ---
+    /** Install the offline demo map pack (works offline) and announce honest status. */
+    fun downloadMapPack() { mapDownloads.installDemoPack(); respond("Map: ${mapDownloads.statusLine()}. ${mapDownloads.detail}") }
+    /** Start a language-pack download (provisioning build only) and announce honest status. */
+    fun downloadLanguages() {
+        languageDownloads.downloadSelected()
+        respond("Languages ${translationPair}: ${languageDownloads.statusLine()}. ${languageDownloads.detail}")
+    }
 
     // --- Navigation Mode = GPS Orientation Lite + offline map-pack status (hazards always override) ---
     /** Visible Navigation panel status: live guidance + honest map-pack line. */
     val navStatusLine: String get() = navigationMode.statusLine()
     /** Honest offline map-pack status ("Map ready offline" / "Map pack missing" / "corrupt"). */
-    val mapPackStatusLine: String get() = mapPacks.statusLine()
+    val mapPackStatusLine: String get() = mapDownloads.statusLine()
     val navigationModeActive: Boolean get() = orientationActive
 
     fun startOrientation() {
@@ -428,8 +451,8 @@ class ObservaController(context: Context) {
 
     // --- Debug/Status screen lines (all truthful; never claim more than is real) ---
     val qnnErrorLine: String get() = "QNN error: ${executorch.qnnError.ifBlank { "none" }}"
-    val mapPackLine: String get() = "Map pack: ${mapPacks.statusLine()}"
-    val languagePackLine: String get() = "Language pack: ${translation.statusLine()}"
+    val mapPackLine: String get() = "Map pack: ${mapDownloads.statusLine()}"
+    val languagePackLine: String get() = "Language pack: ${languageDownloads.statusLine()} (${translationPair})"
     val gpsStatusLine: String get() = "GPS: ${if (locationProvider.hasPermission) "permission granted" else "permission needed"}"
     val compassStatusLine: String get() = "Compass: ${if (compassProvider.available) "available" else "unavailable"}"
     val ocrStatusLine: String get() = "OCR: ${if (ocr.ready) "ready (ML Kit, offline)" else "unavailable"}"

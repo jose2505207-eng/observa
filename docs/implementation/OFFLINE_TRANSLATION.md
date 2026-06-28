@@ -1,5 +1,35 @@
 # Offline Translation Mode
 
+## v2.5.0 — real on-device translation + visible language download
+
+Translation is now a **real, usable** feature via **ML Kit on-device Translation**, with a visible
+**Download Languages** button and screen.
+
+**How to use (Spanish ↔ English default):**
+1. Install the **provisioning** build (has INTERNET): `./gradlew assembleProvisioningDebug` →
+   `adb install -r app/build/outputs/apk/provisioning/debug/app-provisioning-debug.apk`.
+2. Open **Download Languages** → **Download Spanish + English** (one-time network download via ML Kit).
+3. Switch to the **demoOffline** build (no INTERNET) or enable Airplane Mode:
+   `adb install -r app/build/outputs/apk/demoOffline/debug/app-demoOffline-debug.apk` (same
+   applicationId → the downloaded models persist).
+4. Open **Translate** / the Language screen → type Spanish (e.g. "¿Dónde está la entrada?") → **Translate**
+   → real English output, **fully offline**.
+
+**Honesty:** "Translation ready offline" appears only when ML Kit reports both language models actually
+downloaded. The result is ML Kit's real output — never fabricated. Downloads only run in the
+provisioning build (`BuildConfig.SETUP_MODE`); the demoOffline build translates installed models but
+cannot download (no INTERNET) and says so. Voice input availability is shown separately; **text
+translation works regardless of speech availability**. No cloud translation, ever.
+
+**Code:** `translation/MlKitOnDeviceTranslator.kt` (download/translate/delete via ML Kit),
+`translation/LanguageDownloadController.kt` (state + readiness), `translation/TranslationReadiness.kt`,
+`ui/LanguageDownloadScreen.kt`. Build flavors in `app/build.gradle.kts`; INTERNET split in
+`src/demoOffline/AndroidManifest.xml` (strips) vs `src/provisioning/AndroidManifest.xml` (adds).
+
+---
+
+# Offline Translation Mode (original readiness-gate design)
+
 **Status: honest readiness gate + full offline pipeline scaffold implemented — no fake translation, no
 network.** Real two-way translation is gated on an offline language pack + local speech + a local
 translation engine; none of the three is bundled in the no-INTERNET runtime build, so the mode reports

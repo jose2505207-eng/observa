@@ -1,5 +1,31 @@
 # Offline Maps / Navigation Mode
 
+## v2.5.0 — visible Download Map + offline provisioning
+
+There is now a visible **Download Map** button and a Map Download screen.
+
+**How to use:**
+- **Install Demo Map Pack** (works in **any** build, no network): writes an OBSERVA waypoint bundle to
+  `filesDir/map_packs/demo.map` (header `OBSERVA_MAP_V1`). Navigation then reports "Map ready offline"
+  and uses the offline map context. Honestly labeled **"Demo offline map pack"** — waypoints + metadata,
+  not full street tiles.
+- **Download Area Map** (real regional map): gated to the **provisioning** build (INTERNET). The
+  demoOffline build states this honestly instead of pretending.
+- A pack is **"Ready offline" only after `MapPackVerifier` passes** (non-empty, readable, recognized
+  header — OBSERVA demo or Mapsforge magic). Delete is supported.
+
+**Two flavors** (privacy split): `demoOffline` (default, no INTERNET) vs `provisioning` (`-setup`, adds
+INTERNET). Same applicationId, so a pack provisioned by the setup build persists for an `adb install -r`
+of the offline build.
+
+**Code:** `maps/MapPackStatus.kt`, `maps/MapRegion.kt`, `maps/MapPackVerifier.kt`,
+`maps/MapPackRepository.kt`, `maps/MapDownloadController.kt`, `ui/MapDownloadScreen.kt`. Navigation reads
+the same `map_packs/` dir via `navigation/OfflineMapPackManager`.
+
+---
+
+# Offline Maps / Navigation Mode (compass-bearing guidance)
+
 **Status: Navigation Mode is real and usable today with compass + GPS bearing guidance. The rendered
 offline-map / route layer is an honest readiness gate — no map pack is bundled in the no-INTERNET
 runtime build.**

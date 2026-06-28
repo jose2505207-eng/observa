@@ -38,6 +38,23 @@ android {
             }
         }
     }
+    // Two flavors. demoOffline (default) has NO INTERNET and proves airplane-mode runtime; provisioning
+    // adds INTERNET for one-time map/language downloads. Same applicationId so ML Kit language models
+    // downloaded by the provisioning build persist for an `adb install -r` of the demoOffline build.
+    flavorDimensions += "network"
+    productFlavors {
+        create("demoOffline") {
+            dimension = "network"
+            isDefault = true
+            versionNameSuffix = "-offline"
+            buildConfigField("Boolean", "SETUP_MODE", "false")
+        }
+        create("provisioning") {
+            dimension = "network"
+            versionNameSuffix = "-setup"
+            buildConfigField("Boolean", "SETUP_MODE", "true")
+        }
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
@@ -73,6 +90,8 @@ dependencies {
     implementation("com.facebook.fbjni:fbjni:0.7.0")
     implementation("com.facebook.soloader:nativeloader:0.10.5")
     implementation(libs.mlkit.text.recognition)
+    // On-device translation (downloads language models once; translates fully offline afterwards).
+    implementation("com.google.mlkit:translate:17.0.3")
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)

@@ -4,6 +4,29 @@ Newest entries first. Append an entry whenever you make a meaningful change to t
 
 ---
 
+## 2026-06-29 — v2.5.0: offline map & language DOWNLOADS + real ML Kit translation + flavors
+
+The user couldn't see any way to download maps or language packs → fixed. Branch
+`feature/offline-maps-languages-v2.5`, tagged **v2.5.0**.
+
+- **Two flavors:** `demoOffline` (default, **no INTERNET**, airplane-mode proof) and `provisioning`
+  (`-setup`, **adds INTERNET**) for one-time downloads. `BuildConfig.SETUP_MODE` gates network. Same
+  applicationId so downloaded models/packs survive an `adb install -r` swap to the offline build.
+  Verified: demoOffline APK has no INTERNET; provisioning has INTERNET + ACCESS_NETWORK_STATE.
+- **Real translation via ML Kit Translate** (`com.google.mlkit:translate`): `MlKitOnDeviceTranslator`
+  + `LanguageDownloadController` + `TranslationReadiness`. Download es/en once → translate fully
+  offline. Never fabricated. New `ui/LanguageDownloadScreen` (download/delete/translate/result).
+- **Map download:** new `maps/` package (`MapPackStatus`, `MapRegion`, `MapPackVerifier`,
+  `MapPackRepository`, `MapDownloadController`). "Install demo map pack" = offline waypoint bundle
+  (honest "Demo offline map pack"); area map gated to provisioning. New `ui/MapDownloadScreen`.
+- **Visible buttons** Download Map + Download Languages (+ existing Awareness/Navigate/Translate/Voice/
+  Read Signs/Repeat). Control Strip a11y actions gain download map/languages, repeat translation.
+- Detector keeps running across screens. NPU one-shot still skel 4000 → honest XNNPACK fallback (~16–28
+  ms). Build (both flavors) + 172 tests green. Device-verified buttons visible + actions present.
+- Docs: `OFFLINE_MAPS.md`, `OFFLINE_TRANSLATION.md`, README, release notes updated.
+
+---
+
 ## 2026-06-29 — Maps/Navigation + Translation made visible in the UI; debug screen; sign reading
 
 The backend controllers existed but the user couldn't *see* Maps or Translate. Fixed: branch

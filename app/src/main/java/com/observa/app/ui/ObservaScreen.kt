@@ -77,9 +77,29 @@ private val Good = Color(0xFF69F0AE)
 
 @Composable
 fun ObservaScreen(controller: ObservaController) {
+    // The processing loop (detector) and TalkBack tracking run at the top level, so detection keeps
+    // running even while the user is on the Map/Language sub-screens.
     LaunchedEffect(Unit) { controller.runProcessingLoop() }
     TrackTalkBackState(controller)
 
+    var screen by remember { mutableStateOf("main") }
+    when (screen) {
+        "map" -> MapDownloadScreen(controller, onBack = { screen = "main" })
+        "lang" -> LanguageDownloadScreen(controller, onBack = { screen = "main" })
+        else -> MainScreen(
+            controller,
+            onOpenMap = { screen = "map" },
+            onOpenLanguages = { screen = "lang" },
+        )
+    }
+}
+
+@Composable
+private fun MainScreen(
+    controller: ObservaController,
+    onOpenMap: () -> Unit,
+    onOpenLanguages: () -> Unit,
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -105,7 +125,7 @@ fun ObservaScreen(controller: ObservaController) {
 
         OperatingLayer(controller)
 
-        ModeButtons(controller)
+        ModeButtons(controller, onOpenMap, onOpenLanguages)
 
         GestureHint(controller)
 
@@ -125,7 +145,7 @@ fun ObservaScreen(controller: ObservaController) {
 
 /** High-contrast, TalkBack-labeled mode buttons — the visible blind-first hub. No icon-only controls. */
 @Composable
-private fun ModeButtons(controller: ObservaController) {
+private fun ModeButtons(controller: ObservaController, onOpenMap: () -> Unit, onOpenLanguages: () -> Unit) {
     Column(
         modifier = Modifier.fillMaxWidth().testTag("modeButtons"),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -141,10 +161,18 @@ private fun ModeButtons(controller: ObservaController) {
             ) { if (controller.navigationModeActive) controller.stopOrientation() else controller.startOrientation() }
         }
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            BigActionButton("Download Map", null,
+                "Open the map download screen. Install the offline map pack.",
+                Modifier.weight(1f), Accent) { onOpenMap() }
+            BigActionButton("Download Languages", null,
+                "Open the language download screen. Install offline translation packs.",
+                Modifier.weight(1f), Accent) { onOpenLanguages() }
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             BigActionButton("Translate", null,
-                "Start translation mode. Offline language readiness. ${controller.translationStatus}.",
+                "Open translation. Offline language readiness. ${controller.translationStatus}.",
                 Modifier.weight(1f), Accent,
-            ) { controller.startTranslation() }
+            ) { onOpenLanguages() }
             BigActionButton("Voice Commands", null,
                 "Open voice commands. Speak a command after the prompt.",
                 Modifier.weight(1f), Accent,
@@ -426,11 +454,13 @@ private fun OperatingLayer(controller: ObservaController) {
             if (controller.navigationModeActive) "Stop navigation" else "Navigate",
         ) { if (controller.navigationModeActive) controller.stopOrientation() else controller.startOrientation(); true },
         CustomAccessibilityAction("Repeat navigation") { controller.repeatOrientation(); true },
+        CustomAccessibilityAction("Download map") { controller.downloadMapPack(); true },
         CustomAccessibilityAction("Translate") { controller.startTranslation(); true },
+        CustomAccessibilityAction("Download languages") { controller.downloadLanguages(); true },
+        CustomAccessibilityAction("Repeat translation") { controller.repeatTranslation(); true },
         CustomAccessibilityAction("Voice commands") { controller.openVoiceCommands(); true },
         CustomAccessibilityAction("Read signs") { controller.readSigns(); true },
         CustomAccessibilityAction("Repeat last alert") { controller.repeatLast(); true },
-        CustomAccessibilityAction("Start scene question") { controller.sceneQuestion(); true },
         CustomAccessibilityAction("Silence alerts") { controller.silenceAlerts(); true },
         CustomAccessibilityAction("Open debug status") { controller.announceDebugStatus(); true },
     )

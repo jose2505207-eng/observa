@@ -46,6 +46,16 @@ unsigned PD on that DSP and loads its skel. Running our model on the NPU would n
 signed/privileged/`userdebug` build or an OEM allowlist. So we run real on-device inference on XNNPACK
 CPU at ~22–32 ms — under the 100 ms danger target — and the app reports the backend honestly."
 
+## Download Maps + Languages (v2.5.0 — the user's ask)
+- [ ] Build both flavors: `./gradlew assembleDemoOfflineDebug assembleProvisioningDebug`.
+- [ ] **Translation demo:** install **provisioning** build → **Download Languages** → Download Spanish +
+  English (needs internet, one time). Then install **demoOffline** build (or Airplane Mode) → type
+  "¿Dónde está la entrada?" → **Translate** → real English, fully offline.
+- [ ] **Map demo:** **Download Map** → **Install Demo Map Pack** (works offline, any build) → navigation
+  shows "Map ready offline".
+- [ ] Privacy proof: `aapt2 dump permissions <demoOffline apk> | grep INTERNET` → nothing.
+  `<provisioning apk>` → INTERNET present (clearly the Setup build).
+
 ## Maps / Translate visibility (the user's ask)
 - [ ] Main screen shows big labeled buttons: **Awareness · Navigate · Translate · Voice Commands ·
   Read Signs · Repeat Alert**.

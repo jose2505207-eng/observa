@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  provisioning (Setup / Download) flavor: ADDS INTERNET + ACCESS_NETWORK_STATE so the user can download
+  offline map packs and ML Kit language models ONE TIME. After download, switch to the demoOffline build
+  (or airplane mode) for fully offline runtime. This build is clearly labeled "Setup / Download Mode".
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+</manifest>

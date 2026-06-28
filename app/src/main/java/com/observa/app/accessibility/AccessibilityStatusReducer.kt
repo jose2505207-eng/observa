@@ -62,7 +62,8 @@ object AccessibilityStatusReducer {
         "Available actions: " +
             (if (s.awarenessActive) "pause awareness" else "start awareness") +
             ", " + (if (s.orientation != null) "stop navigation" else "navigate") +
-            ", translate, voice commands, read signs, repeat last alert, " +
+            ", download map, translate, download languages, voice commands, read signs, " +
+            "repeat last alert, repeat translation, " +
             (if (s.translationInstalled) "translation ready" else "translation not installed") +
             ", silence alerts, debug status. Open the actions menu to choose."
 
