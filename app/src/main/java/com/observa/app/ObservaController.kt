@@ -15,6 +15,9 @@ import com.observa.app.accessibility.OutputEvent
 import com.observa.app.accessibility.OutputPriority
 import com.observa.app.ocr.OcrEngine
 import com.observa.app.ocr.MlKitOcrEngine
+import com.observa.app.nav.DestinationStore
+import com.observa.app.nav.NavigationSession
+import com.observa.app.nav.SensorNavFixProvider
 import com.observa.app.cue.AudioCuePlayer
 import com.observa.app.cue.HapticCuePlayer
 import com.observa.app.cue.SpatialCueEngine
@@ -64,6 +67,9 @@ class ObservaController(context: Context) {
     private val heuristic = HeuristicVisionRuntime()
     private val executorch = ExecuTorchDetector()
     private val ocr: OcrEngine = MlKitOcrEngine()
+    private val destinations = DestinationStore()
+    private val navSession = NavigationSession()
+    private val navFixProvider = SensorNavFixProvider(context)
     private val appContext = context.applicationContext
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     @Volatile private var modelInitialized = false
@@ -244,6 +250,49 @@ class ObservaController(context: Context) {
         )
     }
 
+    // --- Offline navigation (guidance-first; hazards always override via router priority) ---
+
+    val navigating: Boolean get() = navSession.active
+    val savedDestinations: List<String> get() = destinations.all().map { it.name }
+
+    fun startNavigation(name: String) {
+        val dest = destinations.find(name)
+        if (dest == null) { respond("Destination $name not found. Try a saved place."); return }
+        navFixProvider.start()
+        navSession.start(dest)
+        respond("Navigating to ${dest.name}. Source: ${navFixProvider.sourceLabel}.")
+    }
+
+    fun stopNavigation() {
+        if (!navSession.active) { respond("Not navigating."); return }
+        navSession.stop()
+        navFixProvider.stop()
+        respond("Navigation stopped.")
+    }
+
+    fun whereAmI() {
+        val dest = navSession.destination
+        if (dest == null) { respond("Not navigating. Say navigate to, then a saved place."); return }
+        val g = com.observa.app.nav.GuidanceEngine().guide(navFixProvider.current(), dest)
+        respond(g.speech)
+    }
+
+    /** Emit one navigation guidance utterance if due. NAVIGATION priority → a hazard interrupts it. */
+    private fun navigationTick() {
+        if (!navSession.active || demoMode) return
+        val g = navSession.tick(navFixProvider.current(), System.currentTimeMillis()) ?: return
+        voiceState = g.speech
+        router.emit(
+            OutputEvent(
+                priority = OutputPriority.NAVIGATION,
+                speech = g.speech,
+                braille = g.braille,
+                urgent = false,
+            )
+        )
+        if (g.arrived) navFixProvider.stop()
+    }
+
     private fun currentBrailleLine(): String =
         BrailleStatusPresenter.format(BrailleSnapshot(observing, muted, executorch.status.label))
 
@@ -281,6 +330,7 @@ class ObservaController(context: Context) {
                     hazards.forEach { emit(it) }
                 }
             }
+            navigationTick()
             delay(duty.analysisIntervalMs)
         }
     }
@@ -404,6 +454,7 @@ class ObservaController(context: Context) {
         spatialCue.release()
         executorch.close()
         ocr.close()
+        navFixProvider.stop()
         speaker.shutdown()
     }
 
@@ -415,9 +466,10 @@ class ObservaController(context: Context) {
         override fun repeat() = router.repeatLast()
         override fun readText() = this@ObservaController.readText()
         override fun describeScene() = this@ObservaController.describeScene()
-        override fun navigateTo(destination: String) = respond("Navigation is not available yet.")
+        override fun navigateTo(destination: String) = startNavigation(destination)
+        override fun stopNavigation() = this@ObservaController.stopNavigation()
         override fun find(target: String) = respond("Object finding is not available yet.")
-        override fun whereAmI() = respond("Location is not available offline yet.")
+        override fun whereAmI() = this@ObservaController.whereAmI()
         override fun whatIsAhead() = this@ObservaController.whatIsAhead()
         override fun cancel() = respond("Cancelled.")
         override fun mute() { setMute(true); respond("Muted.") }

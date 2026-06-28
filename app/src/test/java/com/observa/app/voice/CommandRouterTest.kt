@@ -17,6 +17,7 @@ class CommandRouterTest {
         override fun readText() { calls += "readText" }
         override fun describeScene() { calls += "describeScene" }
         override fun navigateTo(destination: String) { calls += "navigateTo:$destination" }
+        override fun stopNavigation() { calls += "stopNavigation" }
         override fun find(target: String) { calls += "find:$target" }
         override fun whereAmI() { calls += "whereAmI" }
         override fun whatIsAhead() { calls += "whatIsAhead" }

@@ -9,6 +9,7 @@ sealed class CommandIntent {
     object ReadText : CommandIntent()
     object DescribeScene : CommandIntent()
     data class NavigateTo(val destination: String) : CommandIntent()
+    object StopNavigation : CommandIntent()
     data class Find(val target: String) : CommandIntent()
     object WhereAmI : CommandIntent()
     object WhatIsAhead : CommandIntent()

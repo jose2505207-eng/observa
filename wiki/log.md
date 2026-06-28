@@ -4,6 +4,26 @@ Newest entries first. Append an entry whenever you make a meaningful change to t
 
 ---
 
+## 2026-06-28 — v1.7.0 offline navigation (guidance-first)
+
+Branch `feature/v1.7-offline-navigation`. Build + 106 unit tests pass; no `INTERNET` and no
+location permission; device-verified on S25 Ultra in Airplane Mode.
+
+- Guidance-first offline navigation (not a sighted map): `Geo` (haversine + bearing),
+  `GuidanceEngine` (reuses `RelativeDirectionTranslator` for clock-face), `SavedDestination`/
+  `DestinationStore` (offline, demo set), `NavigationSession` (throttled, arrival).
+- Heading from the **real device compass** (`SensorNavFixProvider`, rotation-vector, offline);
+  **location is a documented demo fix** (no live GPS / no `ACCESS_FINE_LOCATION` in this build),
+  announced honestly via `sourceLabel`. GPS reported LOW so guidance always cautions.
+- Guidance routes at NAVIGATION priority → TTS + Braille + repeat; **hazards override** (router).
+- Voice: "navigate to <place>", "stop navigation", "where am I", "repeat"; accessible nav UI panel
+  (Go/Where am I/Stop, TalkBack-labeled, testTag). Device: spoke "Destination ahead. home."
+- Honest GPS/compass uncertainty: "GPS accuracy low. Use caution." / "Compass accuracy low.
+  Calibrate phone." Docs: `docs/offline-navigation.md`, `docs/manual-test-offline-navigation.md`.
+
+**Still not done:** live GPS provider + movement validation; map packs/road graph (straight-line
+distances); v1.5 model artifact still unbundled; v1.8 release polish.
+
 ## 2026-06-28 — v1.6.0 foreground service & reliability
 
 Branch `feature/v1.6-foreground-service`. Build + 92 unit tests pass; no `INTERNET`

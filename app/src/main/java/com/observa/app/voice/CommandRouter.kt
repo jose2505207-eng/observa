@@ -9,6 +9,7 @@ interface CommandActions {
     fun readText()
     fun describeScene()
     fun navigateTo(destination: String)
+    fun stopNavigation()
     fun find(target: String)
     fun whereAmI()
     fun whatIsAhead()
@@ -51,7 +52,7 @@ class CommandRouter(
         when (intent) {
             is CommandIntent.Unknown -> actions.confirm("Command not recognized. Say help.")
             // Safety / always-available commands bypass confirmation.
-            is CommandIntent.Stop, is CommandIntent.Cancel,
+            is CommandIntent.Stop, is CommandIntent.Cancel, is CommandIntent.StopNavigation,
             is CommandIntent.Mute, is CommandIntent.Unmute,
             is CommandIntent.BrailleOn, is CommandIntent.BrailleOff, is CommandIntent.BrailleStatus,
             is CommandIntent.Help, is CommandIntent.Repeat -> execute(intent)
@@ -75,6 +76,7 @@ class CommandRouter(
             is CommandIntent.ReadText -> actions.readText()
             is CommandIntent.DescribeScene -> actions.describeScene()
             is CommandIntent.NavigateTo -> actions.navigateTo(intent.destination)
+            is CommandIntent.StopNavigation -> actions.stopNavigation()
             is CommandIntent.Find -> actions.find(intent.target)
             is CommandIntent.WhereAmI -> actions.whereAmI()
             is CommandIntent.WhatIsAhead -> actions.whatIsAhead()

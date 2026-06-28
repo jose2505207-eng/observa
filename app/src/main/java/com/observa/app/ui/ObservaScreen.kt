@@ -392,7 +392,52 @@ private fun Controls(controller: ObservaController) {
         fontSize = 14.sp,
         modifier = Modifier.padding(top = 4.dp),
     )
+    Spacer(Modifier.height(8.dp))
+    NavPanel(controller)
     Spacer(Modifier.height(4.dp))
+}
+
+/** Accessible, guidance-first navigation controls: saved destinations + stop + where am I. */
+@Composable
+private fun NavPanel(controller: ObservaController) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Panel, RoundedCornerShape(12.dp))
+            .padding(12.dp)
+            .testTag("navPanel"),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text("Navigation (offline)", color = Accent, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        controller.savedDestinations.forEach { name ->
+            Button(
+                onClick = { controller.startNavigation(name) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .semantics { contentDescription = "Navigate to $name" },
+                colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Bg),
+            ) { Text("Go: $name", fontSize = 18.sp, fontWeight = FontWeight.Bold) }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Button(
+                onClick = { controller.whereAmI() },
+                modifier = Modifier.weight(1f).height(56.dp)
+                    .semantics { contentDescription = "Where am I" },
+                colors = ButtonDefaults.buttonColors(containerColor = Panel, contentColor = OnDark),
+            ) { Text("Where am I", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
+            Button(
+                onClick = { controller.stopNavigation() },
+                enabled = controller.navigating,
+                modifier = Modifier.weight(1f).height(56.dp)
+                    .semantics { contentDescription = "Stop navigation" },
+                colors = ButtonDefaults.buttonColors(containerColor = Panel, contentColor = OnDark),
+            ) { Text("Stop nav", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
+        }
+    }
 }
 
 /** Target size of the optional RGB capture handed to a real model (downscaled, in-process only). */

@@ -15,7 +15,15 @@ The **directional cue output layer is implemented** (device-verified); the **act
 - Cues are emitted through `SpatialCueEngine`: stereo-**panned** synthesized audio (`AudioCuePlayer`, in-memory, offline) + **directional haptics** (`HapticCuePlayer`: left/right/forward/urgent-stop/confirm/error). Speech says the direction ("on your left/right/ahead"); non-speech cues keep working when speech is muted (safety). Throttled via `CueThrottler`; toggles for audio cues and haptics.
 - **Not built:** the closed-loop "orient toward a target" correction ("a little right… there"), and any precise localization beyond left/center/right.
 
+## Offline navigation (v1.7, shipped)
+Beyond per-detection direction, OBSERVA now has a **guidance-first offline navigation** layer:
+clock-face, heading-relative instructions toward saved destinations using the real device compass
+(location is a documented demo fix; no live GPS yet). Routes at NAVIGATION priority so hazards
+override. See `docs/offline-navigation.md`. (`Geo`, `GuidanceEngine`, `DestinationStore`,
+`NavigationSession`, `SensorNavFixProvider`.)
+
 ## Future Vision
+- Live GPS provider + map packs / road graph for true turn-by-turn.
 - Use detection position over time to guide the user to face/approach a target so a Tier 2 action ([[ocr-mode]], [[conversational-vision]]) can capture it well.
 - Provide simple, calm correction rather than rapid chatter.
 

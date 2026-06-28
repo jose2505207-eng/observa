@@ -27,6 +27,9 @@ class VoiceCommandParser {
         phrase(text, "braille off", "disable braille")?.let { return it.to(CommandIntent.BrailleOff) }
         phrase(text, "braille status", "braille")?.let { return it.to(CommandIntent.BrailleStatus) }
 
+        // "stop navigation" before the bare "stop" (which stops observing).
+        phrase(text, "stop navigation", "cancel navigation", "end navigation")?.let { return it.to(CommandIntent.StopNavigation) }
+
         word(text, "start", "begin", "resume")?.let { return it.to(CommandIntent.Start) }
         word(text, "stop", "pause")?.let { return it.to(CommandIntent.Stop) }
         word(text, "help", "commands")?.let { return it.to(CommandIntent.Help) }
