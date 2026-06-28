@@ -16,9 +16,11 @@ owner: jose2505207-eng
 - **The load blocker is fixed:** ExecuTorch's `Module` loads native libs via Facebook SoLoader, so the app now declares `com.facebook.fbjni:fbjni:0.7.0` + `com.facebook.soloader:nativeloader:0.10.5`. Without them `Module.load` threw `ClassNotFoundException: NativeLoader` and fell back to heuristic.
 - **QNN is truthful and NOT active.** `QnnRuntimeChecker` detects the delegate library *inside the APK* and reports "present (not active)". `LOADED_QNN` is set **only** when a loaded model's `forward` backends actually include a QNN backend — never from library presence. The shipped model is XNNPACK CPU, so the app reports QNN off.
 
-## QNN/NPU path (attempted, not shipped)
-- The Qualcomm QNN SDK is present (`qairt/2.47.0.260601`) and the ExecuTorch QNN python backend imports; `scripts/export_detector.py --qnn` lowers to the QNN partitioner.
-- **Blocker to ship:** a QNN-delegated `.pte` also needs the Qualcomm HTP runtime `.so`s (`libQnnHtp.so`, `libQnnSystem.so`, SM8750 HTP v79 stub/skel) in the APK `jniLibs`; the AAR ships only the ET↔QNN bridge lib. Since XNNPACK already meets the target at 32 ms, QNN is the next battery/headroom stretch. Detail: `docs/implementation/MODEL_RUNTIME.md`.
+## QNN/NPU path — host AOT unblocked (v2.1.0); YOLOv8n graph still blocks (not shipped)
+- The Qualcomm QNN SDK is present (`qairt/2.47.0.260601`) and the ExecuTorch QNN python backend imports.
+- **v2.0.0 blocker SOLVED:** the host op-support check's `QnnManager.InitBackend()` previously failed (`Failed to initialize QNN backend for kHtpBackend`). Native logs showed the real cause — `unknown custom config socModel 0` / device error 14001, reproducing on SM8650/SM8550 too — an **ABI mismatch** between the prebuilt ExecuTorch 1.3.1 wheel's QNN host pybind and QNN SDK 2.47's HTP device-config struct. **Fix:** rebuilt the QNN host pybind from the local `executorch/` source tree against SDK 2.47 → `InitBackend` now returns 0 and a real Conv2d→ReLU model lowers fully to QNN HTP.
+- **New blocker (model graph):** the full YOLOv8n graph fails QNN's `I64toI32` pass at the detection head's anchor decode (`expand: dimension 3 -> 1`). A model-graph issue, not a QNN-init one; needs the head reshaped. Also cannot be device-verified without a device.
+- **Still to ship:** resolve the head; match the export toolchain to the 1.4.0a0 AAR; package the v79 device `.so`s (`libQnnHtp.so`, `libQnnSystem.so`, HTP v79 stub/skel) in APK `jniLibs` (AAR ships only the ET↔QNN bridge). Since XNNPACK already meets the target at 32 ms, QNN stays a battery/headroom stretch. Detail: `docs/implementation/MODEL_RUNTIME.md`.
 
 ## Verified (the bar this page held)
 - ExecuTorch version matched (local 1.4.0a0 tree built the AAR and exported the `.pte`). ✓

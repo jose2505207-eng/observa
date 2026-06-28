@@ -4,6 +4,20 @@ Offline-first, privacy-first AI vision assistant for blind and low-vision users.
 `main` shippable: each builds, passes unit tests, has **no `INTERNET` permission**, and launches in
 airplane mode with camera preview intact.
 
+## v2.1.0 — QNN host AOT unblocked (real fix); YOLOv8n graph still blocks
+- **Solved the v2.0.0 QNN host blocker.** `QnnManager.InitBackend()` (`Failed to initialize QNN
+  backend for kHtpBackend`) was an **ABI mismatch** between the prebuilt ExecuTorch 1.3.1 wheel's QNN
+  host pybind and QNN SDK 2.47's HTP device-config (native logs: `unknown custom config socModel 0`,
+  error 14001, reproducing on SM8650/SM8550). Rebuilding the QNN host pybind from the local
+  `executorch/` source against SDK 2.47 fixes it: `InitBackend` returns 0 and a real model lowers to
+  QNN HTP.
+- **Not shipped:** the full YOLOv8n graph still fails QNN's `I64toI32` pass at the detection-head
+  anchor decode (`expand: dimension 3 -> 1`) — a model-graph issue, not QNN init. No device this
+  session to verify either. **XNNPACK CPU remains the shipped detector (32 ms, under target).** No
+  fake QNN claims; the app still reports `LOADED_QNN` only when a model's `forward` backends include QNN.
+- `scripts/export_detector.py --qnn` now uses `to_edge_transform_and_lower_to_qnn`. Docs:
+  `implementation/MODEL_RUNTIME.md`, wiki `executorch-qnn` updated with the exact cause/fix/blocker.
+
 ## v2.0.0 — real on-device ExecuTorch inference
 - **Ships a real local ML object detector.** YOLOv8n (COCO-80) → ExecuTorch, 320×320, **XNNPACK** CPU
   delegate, bundled as `assets/models/observa_detector.pte`. Verified on the Galaxy S25 Ultra

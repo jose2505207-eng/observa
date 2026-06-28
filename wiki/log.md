@@ -4,6 +4,30 @@ Newest entries first. Append an entry whenever you make a meaningful change to t
 
 ---
 
+## 2026-06-27 — v2.1.0 QNN host AOT unblocked (real root cause + fix); YOLOv8n graph still blocks
+
+Disciplined QNN/NPU unblock loop. App build + unit tests still green; no `INTERNET`; XNNPACK remains
+the shipped detector. No device attached this session, so nothing QNN was device-claimed.
+
+- **v2.0.0 host blocker root-caused and FIXED.** `QnnManager.InitBackend()` failed with
+  `Failed to initialize QNN backend for kHtpBackend`. Native QNN logs (`QNN_LOG_LEVEL=DEBUG`) showed
+  the real cause: `unknown custom config socModel 0` / device error 14001 — reproducing on SM8650 and
+  SM8550 too, so not chipset-specific. It was an **ABI mismatch** between the prebuilt ExecuTorch
+  **1.3.1 wheel's** QNN host pybind and **QNN SDK 2.47's** HTP device-config struct. Rebuilt the QNN
+  host pybind from the local `executorch/` source tree against SDK 2.47 (`make PyQnnManagerAdaptor` in
+  `build-x86`). Result: `InitBackend()` returns **0**, and a real Conv2d→ReLU model lowers fully to
+  QNN HTP (valid `QnnBackend` `.pte`).
+- **New blocker (model graph):** full YOLOv8n export fails QNN's `I64toI32` pass at the detection
+  head's anchor decode (`expand: dimension 3 -> 1`). Model-graph issue, not QNN init. No QNN `.pte`
+  shipped; no QNN device `.so`s packaged (would be dead weight without a model).
+- `scripts/export_detector.py --qnn` switched to the correct `to_edge_transform_and_lower_to_qnn`
+  helper (carries `soc_model` into the host device config; the bare partitioner path lost it → socModel 0).
+- Docs: `docs/implementation/MODEL_RUNTIME.md` and `executorch-qnn.md` rewritten with the exact cause,
+  fix, and remaining blockers. App runtime backend reporting unchanged (already truthful:
+  `LOADED_QNN` only when `forward` backends include QNN).
+
+---
+
 ## 2026-06-27 — v2.0.0 REAL on-device ExecuTorch inference (Agent 1 gate met)
 
 Build + unit tests pass; no `INTERNET`; **device-verified on S25 Ultra (SM8750) in Airplane Mode**.

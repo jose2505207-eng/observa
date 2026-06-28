@@ -65,20 +65,33 @@ def main() -> int:
     backend_tag = "cpu-portable"
     if args.qnn:
         # Lower to the Qualcomm QNN backend (HTP/NPU) for the Snapdragon 8 Elite (SM8750, HTP v79).
-        # Requires the Qualcomm QNN SDK ($QNN_SDK_ROOT) and its x86_64 host libs on LD_LIBRARY_PATH
-        # ($QNN_SDK_ROOT/lib/x86_64-linux-clang) so the partitioner's host op-support check can init
-        # the HTP backend. See docs/implementation/MODEL_RUNTIME.md for the device-lib packaging too.
-        from executorch.backends.qualcomm.partition.qnn_partitioner import QnnPartitioner
+        # Requires the Qualcomm QNN SDK ($QNN_SDK_ROOT), its x86_64 host libs on LD_LIBRARY_PATH
+        # ($QNN_SDK_ROOT/lib/x86_64-linux-clang), AND an ExecuTorch QNN host pybind built against the
+        # SAME QNN SDK version (see docs/implementation/MODEL_RUNTIME.md — the prebuilt wheel's pybind
+        # had an ABI mismatch with SDK 2.47 that made `InitBackend` fail; rebuilding it fixes that).
+        #
+        # NOTE (v2.1.0): the QNN host backend now initializes and lowers real graphs to HTP, but the
+        # full YOLOv8n graph still fails QNN's `I64toI32` pass at the detection head's anchor decode
+        # (`RuntimeError: expand: dimension 3 -> 1`). Until that head is reshaped for QNN this `--qnn`
+        # path does not yet produce a YOLOv8n `.pte`; XNNPACK remains the shipped detector.
         from executorch.backends.qualcomm.utils.utils import (
-            generate_qnn_executorch_compiler_spec, generate_htp_compiler_spec)
+            generate_qnn_executorch_compiler_spec, generate_htp_compiler_spec,
+            to_edge_transform_and_lower_to_qnn)
         from executorch.backends.qualcomm.serialization.qc_schema import QcomChipset
         spec = generate_qnn_executorch_compiler_spec(
             soc_model=QcomChipset.SM8750,
             backend_options=generate_htp_compiler_spec(use_fp16=True),
         )
-        edge = to_edge_transform_and_lower(exported, partitioner=[QnnPartitioner(spec)])
-        backend_tag = "qnn-htp"
-        print("[export] QNN HTP partitioning applied (SM8750 / HTP v79)")
+        # Use the proper helper: it opens a QnnManagerContext that carries soc_model=SM8750 into the
+        # host device config BEFORE partitioning. The bare `to_edge_transform_and_lower(partitioner=
+        # [QnnPartitioner])` path hits a fallback that loses soc_model (device init then sees socModel=0).
+        edge = to_edge_transform_and_lower_to_qnn(model, example, spec)
+        prog = edge.to_executorch()
+        os.makedirs(os.path.dirname(args.out), exist_ok=True)
+        with open(args.out, "wb") as f:
+            f.write(prog.buffer)
+        print(f"[export] wrote {args.out} backend=qnn-htp (SM8750 / HTP v79)")
+        return 0
     elif not args.no_xnnpack:
         # XNNPACK is the standard optimized CPU delegate; ~10-40x faster than portable reference
         # kernels on ARM. Bundled in the executorch.aar libexecutorch.so. No Qualcomm SDK needed.
