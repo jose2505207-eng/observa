@@ -446,6 +446,70 @@ class ObservaController(context: Context) {
     /** QNN/NPU pipeline stage, for the debug surface. "active" only after a real warm-up forward. */
     val qnnStageLine: String get() = "QNN stage: ${executorch.qnnStage}"
 
+    // --- NPU Debug screen (structured backend diagnostics) ---
+    /** One-line accessible summary: "Backend: XNNPACK CPU. Fell back from QNN at WARMUP_FORWARD: skel 4000". */
+    val npuSummaryLine: String get() = executorch.diagnostics.summaryLine()
+    /** True only when a QNN warm-up forward actually succeeded on device. */
+    val npuActive: Boolean get() = executorch.diagnostics.npuActive()
+
+    /** Build + device identity header for the debug report. */
+    private fun deviceHeader(): String = buildString {
+        append("App ${com.observa.app.BuildConfig.VERSION_NAME} (vc ${com.observa.app.BuildConfig.VERSION_CODE}) ")
+        append("sha ${com.observa.app.BuildConfig.GIT_SHA} built ${com.observa.app.BuildConfig.BUILD_TIME}\n")
+        append("Device ${android.os.Build.MODEL} (${android.os.Build.DEVICE}) · Android ${android.os.Build.VERSION.RELEASE} (API ${android.os.Build.VERSION.SDK_INT})\n")
+        append("ABI ${android.os.Build.SUPPORTED_ABIS.firstOrNull()} · board ${android.os.Build.BOARD} · hardware ${android.os.Build.HARDWARE}")
+        if (android.os.Build.VERSION.SDK_INT >= 31) append(" · soc ${android.os.Build.SOC_MODEL}")
+    }
+
+    /** Structured lines for the NPU Debug screen (all TalkBack-readable). */
+    fun npuDebugLines(): List<String> = buildList {
+        add(npuSummaryLine)
+        add(deviceHeader())
+        add("Backend priority: ${com.observa.app.inference.BackendSelector.priorityDescription()}")
+        add(backendStatusLine)
+        add(qnnStageLine)
+        add("NPU active: $npuActive")
+        executorch.diagnostics.firstFailure()?.let {
+            add("First failure: ${it.backend.name}/${it.stage.name} ${it.nativeHint.ifBlank { it.message }}")
+        }
+        if (!npuActive) add(
+            "Native HTP blocker (via: adb logcat | grep QnnDsp): on this retail S25 Ultra the QNN " +
+                "warm-up shows 'Failed to load skel, error 4000' / device_handle 14001 — the cDSP refuses " +
+                "the third-party unsigned protection domain. In-app native-log read is blocked for " +
+                "untrusted_app, so capture it over adb.")
+        add("— attempts —")
+        executorch.diagnostics.all().forEach { a ->
+            add("${a.backend.label} · ${a.stage.name} · ${if (a.success) "ok" else "FAIL"}" +
+                (if (a.elapsedMs > 0) " ${a.elapsedMs}ms" else "") +
+                (if (a.nativeHint.isNotBlank()) " · ${a.nativeHint}" else "") +
+                (if (a.message.isNotBlank()) " · ${a.message}" else ""))
+        }
+        add(mapPackLine); add(languagePackLine); add(gpsStatusLine); add(compassStatusLine)
+        add(ocrStatusLine); add(voiceStatusLine); add(internetStatusLine); add(readinessSummaryLine)
+    }
+
+    /** Full copy-paste debug report (for judges / Qualcomm). */
+    fun npuDebugReport(): String = executorch.diagnostics.report(deviceHeader())
+
+    /** "Force QNN attempt once" / "Run detector warm-up": re-run init off the UI thread, then announce. */
+    fun forceQnnAttempt() {
+        respond("Re-running QNN attempt…")
+        scope.launch {
+            withContext(Dispatchers.IO) { executorch.initialize(appContext) }
+            detectorBackend = backendOf(executorch.status)
+            respond(npuSummaryLine)
+        }
+    }
+
+    /** "Disable GPU fallback for this session" — honest no-op (no GPU path exists), but documents policy. */
+    fun setDisableGpuFallback(disabled: Boolean) {
+        com.observa.app.inference.BackendSelector.disableGpuFallback = disabled
+        respond(if (disabled) "GPU fallback disabled for NPU investigation. No GPU path is implemented anyway; fallback is XNNPACK CPU."
+        else "GPU fallback flag cleared. Note: OBSERVA has no GPU path.")
+    }
+    val gpuFallbackDisabled: Boolean get() = com.observa.app.inference.BackendSelector.disableGpuFallback
+    fun announceCopied() = respond("NPU debug report copied to clipboard.")
+
     /** Speak the engineering/debug detector status (kept out of normal alert output). */
     fun announceDebugStatus() = respond("$backendStatusLine. $qnnStageLine. ${aiDiagnostics}")
 

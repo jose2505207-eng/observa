@@ -4,6 +4,25 @@ Newest entries first. Append an entry whenever you make a meaningful change to t
 
 ---
 
+## 2026-06-29 — NPU Debug menu + structured backend diagnostics (release-blocker probe)
+
+Investigated the "running on GPU/CPU not NPU" release blocker. Branch `fix-npu-runtime`.
+
+- **Key finding: the app was NOT on GPU.** No GPU/Vulkan/LiteRT path is compiled in at all
+  (`grep` over `app/src/main/java` is empty). The only fallback is **XNNPACK CPU**, now labeled.
+- New `inference/` package: `BackendKind`, `BackendStage`, `BackendAttempt`, `BackendDiagnostics`,
+  `BackendSelector`. Per-stage attempts logged under one grep tag **OBSERVA_NPU**. Device-verified:
+  `EXECUTORCH_QNN MODEL_LOAD ok backends=[QnnBackend]` → `WARMUP_FORWARD fail` → `FALLBACK` →
+  `XNNPACK_CPU ACTIVE ok`. `npuActive()` only after a real QNN warm-up+active.
+- New `ui/NpuDebugScreen` (NPU Debug button + "Open NPU debug" TalkBack action): build/device identity,
+  backend priority, per-stage attempts, `.pte` sha, exact blocker; Force QNN Attempt / Copy Debug Report
+  / GPU-fallback toggle. Accessible summary node.
+- NPU still blocked: QNN `.pte` loads, warm-up fails at HTP device-handle (`skel 4000` / `14001`),
+  reproduced; in-app native-log read is blocked for untrusted_app (capture via adb). Doc:
+  `docs/implementation/NPU_DEBUG_REPORT.md`. Build + 177 tests green; demoOffline no INTERNET. Not tagged.
+
+---
+
 ## 2026-06-29 — v2.5.0: offline map & language DOWNLOADS + real ML Kit translation + flavors
 
 The user couldn't see any way to download maps or language packs → fixed. Branch
